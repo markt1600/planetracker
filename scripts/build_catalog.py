@@ -5,6 +5,7 @@ Sources (all public storefront product feeds):
   amsg  airplanemodelsg.com       WooCommerce Store API   prices in SGD (preferred price source)
   ard   aviationretaildirect.com  Shopify products.json   prices in GBP
   tas   airplaneshop.com          Shopify products.json   prices in USD
+  wcd   westcoastdiecast.ca       Shopify products.json   prices in CAD
 
 Usage:
   python3 scripts/build_catalog.py           # rebuild from .cache/catalog-raw
@@ -29,7 +30,14 @@ UA = "Mozilla/5.0 (compatible; catalog-builder/1.0)"
 BRANDS = [
     "GeminiJets", "JC Wings", "NG Models", "Aviation 400",
     "InFlight200", "Herpa Wings", "Phoenix Models", "AeroClassics",
+    # Further manufacturers carried by the source retailers.
+    "Panda Models", "SQ Wings", "HX Wings", "Aero Polaris", "C Models", "Big Bird", "V1 Models",
+    "YU Model", "Patriot Models", "HYJL Wings", "Dragon Wings", "Apollo",
 ]
+MORE_BRANDS = (("panda", "Panda Models"), ("sq wings", "SQ Wings"), ("hx ", "HX Wings"), ("aeropolaris", "Aero Polaris"),
+               ("aero polaris", "Aero Polaris"), ("^c model", "C Models"), ("big bird", "Big Bird"), ("v1 models", "V1 Models"),
+               ("v1:400", "V1 Models"), ("yu model", "YU Model"), ("yu400", "YU Model"), ("patriot", "Patriot Models"),
+               ("hyjl", "HYJL Wings"), ("dragon wings", "Dragon Wings"), ("apollo", "Apollo"))
 DEFAULT_SCALE = {"Aviation 400": "1:400", "InFlight200": "1:200", "AeroClassics": "1:400",
                  "NG Models": "1:400", "Phoenix Models": "1:400"}
 
@@ -73,7 +81,7 @@ def fetch_shopify(sub, base, prefix):
 
 
 def fetch_all():
-    for sub in ("amsg", "ard", "tas"):
+    for sub in ("amsg", "ard", "tas", "wcd"):
         for f in glob.glob(os.path.join(RAW, sub, "*.json")):
             os.remove(f)
     page = 1
@@ -89,6 +97,7 @@ def fetch_all():
     for c in ARD_COLLECTIONS:
         fetch_shopify("ard", f"https://www.aviationretaildirect.com/collections/{c}", f"col.{c}")
     fetch_shopify("tas", "https://www.airplaneshop.com", "all")
+    fetch_shopify("wcd", "https://westcoastdiecast.ca", "all")
 
 
 # ---------------------------------------------------------------- parsing
@@ -253,7 +262,7 @@ def brand_from_vendor(v):
     if "herpa" in v and "snap" not in v: return "Herpa Wings"
     if v.startswith("phoenix"): return "Phoenix Models"
     if "aero classics" in v: return "AeroClassics"
-    return None
+    return next((b for k, b in MORE_BRANDS if (v.startswith(k[1:]) if k[0] == "^" else k in v + " ")), None)
 
 
 def norm_key(brand, number):
@@ -335,6 +344,22 @@ def rec_shopify(p, source, currency, base):
             a = next((t[8:] for t in tags if t.startswith("airline-")), None)
             if a:
                 info["airline"] = a.replace("-", " ").title()
+    elif source == "wcd":
+        # "<Month Year Release> <Brand> <Airline> <Type> <Reg> [- Pre Order] [- 1/200]"; the brand is the product type.
+        kind = (p.get("product_type") or "").lower()
+        brand = next((b for k, b in (("gemini", "GeminiJets"), ("jc wings", "JC Wings"), ("ng model", "NG Models"),
+                                     ("av400", "Aviation 400"), ("aviation 400", "Aviation 400"), ("inflight", "InFlight200"),
+                                     ("herpa", "Herpa Wings"), ("phoenix", "Phoenix Models"), ("aeroclassics", "AeroClassics")) + MORE_BRANDS if (kind.startswith(k[1:]) if k[0] == "^" else k in kind + " ")), None)
+        if not brand or not sku or sku.lower() == "none":
+            return None
+        number = sku.upper()
+        if brand == "NG Models" and number.isdigit(): number = "NG" + number
+        if brand == "Phoenix Models" and number.isdigit(): number = "PH" + number
+        desc = re.sub(r"\s*-\s*(Pre[- ]?Order|1/\d+)\b", "", title, flags=re.I)
+        desc = re.sub(r"^.*?\b(NG Models|Phoenix Models|AV400|Aviation 400|JC Wings|Gemini Jets|Gemini 200|Gemini200|Aeroclassics|Inflight ?200|Herpa|Panda Models?|SQ Wings|HX Wings|Aero ?polaris|C Models?|Big Bird|V1 Models?|YU Models?|Patriot Models?|HYJL Wings|Dragon Wings|Apollo)\s+", "", desc, count=1, flags=re.I).strip()
+        sm = next((re.match(r"1/(\d+)$", t) for t in tags if re.match(r"1/\d+$", t)), None) or re.search(r"\b1/(\d+)\b", title)
+        scale = "1:" + sm.group(1) if sm else None
+        info = parse(desc, airline_first=True)
     else:
         m = re.match(r"^(GEMINI200|GEMINIMACS|GEMINI|HERPA|INFLIGHT200)\s+(.*)$", title)
         if not m or p.get("product_type") not in ("AIRCRAFT", ""):
@@ -360,14 +385,15 @@ def rec_shopify(p, source, currency, base):
     imgs = p.get("images") or []
     image = shopify_img(imgs[0]["src"], 800) if imgs else None
     thumb = shopify_img(imgs[0]["src"], 360) if imgs else None
+    more = [shopify_img(i["src"], 800) for i in imgs[1:2]] if source == "wcd" else []
     try:
         amt = float(v.get("price") or 0)
     except ValueError:
         amt = 0
-    name = "Aviation Retail Direct" if source == "ard" else "The Airplane Shop"
+    name = {"ard": "Aviation Retail Direct", "tas": "The Airplane Shop", "wcd": "West Coast Diecast"}[source]
     price = {"source": name, "amount": amt, "currency": currency,
              "url": f"{base}/products/{p['handle']}", "inStock": bool(v.get("available"))} if amt > 0 else None
-    return dict(brand=brand, number=number, scale=scale, title=desc, image=image, thumb=thumb,
+    return dict(brand=brand, number=number, scale=scale, title=desc, image=image, thumb=thumb, more=more,
                 description=strip_html(p.get("body_html"))[:400] or None, price=price, **info)
 
 
@@ -384,7 +410,7 @@ def load(sub, key=None):
 
 def fx_rates():
     """Rates to convert each currency into SGD; live if reachable, else sensible defaults."""
-    rates = {"SGD": 1.0, "GBP": 1.72, "USD": 1.30, "EUR": 1.50, "AUD": 0.85, "MYR": 0.30, "HKD": 0.167}
+    rates = {"SGD": 1.0, "GBP": 1.72, "USD": 1.30, "EUR": 1.50, "AUD": 0.85, "CAD": 0.93, "MYR": 0.30, "HKD": 0.167}
     asof = None
     try:
         d = get("https://api.frankfurter.dev/v1/latest?base=SGD", tries=1)
@@ -412,7 +438,11 @@ def main():
     for p in load("tas", "products"):
         r = rec_shopify(p, "tas", "USD", "https://www.airplaneshop.com")
         if r: recs.append(r)
-    print(f"records: amsg {n1}, ard {n2 - n1}, tas {len(recs) - n2}")
+    n3 = len(recs)
+    for p in load("wcd", "products"):
+        r = rec_shopify(p, "wcd", "CAD", "https://westcoastdiecast.ca")
+        if r: recs.append(r)
+    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd {len(recs) - n3}")
 
     merged = {}
     for r in recs:
@@ -424,9 +454,13 @@ def main():
             m["prices"] = []
         else:
             m = merged[k]
+            # A second retailer's photo of the same model is kept as an extra picture.
+            if m.get("image") and r.get("image") and r["image"] != m["image"]:
+                m.setdefault("extra", []).append(r["image"])
             for f in ("scale", "type", "family", "reg", "airline", "notes", "image", "thumb", "description"):
                 if not m.get(f) and r.get(f):
                     m[f] = r[f]
+        m.setdefault("extra", []).extend(r.get("more") or [])
         if price and not any(x["source"] == price["source"] for x in m["prices"]):
             m["prices"].append(price)
 
@@ -441,6 +475,10 @@ def main():
                "registration": m["reg"], "notes": m["notes"], "remoteImage": m["image"],
                "image": f"/catalog/{slug}.webp" if os.path.exists(os.path.join(ROOT, "public", "catalog", slug + ".webp")) else m["image"],
                "description": m["description"], "prices": m["prices"]}
+        extra = list(dict.fromkeys(m.get("extra") or []))[:3]
+        rec["remoteGallery"] = extra
+        rec["gallery"] = [f"/catalog/{slug}-{n + 2}.webp" for n in range(len(extra))
+                          if os.path.exists(os.path.join(ROOT, "public", "catalog", f"{slug}-{n + 2}.webp"))]
         out.append({a: b for a, b in rec.items() if b not in (None, "", [])})
     # Hand-added models (data/catalog-extra.json) are kept across rebuilds and win over scraped records.
     extra_path = os.path.join(OUT, "catalog-extra.json")
@@ -453,7 +491,7 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     meta = {"builtAt": date.today().isoformat(), "count": len(out), "brands": BRANDS, "fx": fx_rates(),
-            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com"]}
+            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca"]}
     json.dump(out, open(os.path.join(OUT, "catalog.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump(meta, open(os.path.join(OUT, "catalog-meta.json"), "w"), indent=2)
     from collections import Counter

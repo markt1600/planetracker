@@ -21,9 +21,9 @@ UA = "Mozilla/5.0 (compatible; catalog-builder/1.0)"
 MAX_W, QUALITY = 720, 72
 
 
-def grab(rec):
-    out = os.path.join(DEST, rec["id"] + ".webp")
-    url = rec.get("remoteImage")
+def grab(job):
+    name, url = job
+    out = os.path.join(DEST, name + ".webp")
     if not url or os.path.exists(out):
         return "skip"
     slow = "airplanemodelsg.com" in url
@@ -43,15 +43,20 @@ def grab(rec):
         except Exception as e:  # noqa: BLE001
             err = e
             time.sleep(3 * (attempt + 1))
-    print("  failed", rec["id"], err, flush=True)
+    print("  failed", name, err, flush=True)
     return "fail"
 
 
 def main():
     os.makedirs(DEST, exist_ok=True)
     recs = json.load(open(os.path.join(ROOT, "data", "catalog.json")))
-    slow = [r for r in recs if "airplanemodelsg.com" in (r.get("remoteImage") or "")]
-    fast = [r for r in recs if r not in slow]
+    # Main photo is <id>.webp; extra photos from other retailers are <id>-2.webp, <id>-3.webp ...
+    jobs = []
+    for r in recs:
+        jobs.append((r["id"], r.get("remoteImage")))
+        jobs += [(f"{r['id']}-{n + 2}", u) for n, u in enumerate(r.get("remoteGallery") or [])]
+    slow = [j for j in jobs if "airplanemodelsg.com" in (j[1] or "")]
+    fast = [j for j in jobs if j not in slow]
     counts = {}
     for group, workers in ((fast, 6), (slow, 2)):
         with ThreadPoolExecutor(workers) as ex:

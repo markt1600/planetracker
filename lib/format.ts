@@ -1,8 +1,8 @@
 import type { Price } from "./types";
 
-export const CURRENCIES = ["SGD", "USD", "GBP", "EUR", "AUD", "MYR", "HKD"];
+export const CURRENCIES = ["SGD", "USD", "GBP", "EUR", "AUD", "CAD", "MYR", "HKD"];
 
-const SYMBOLS: Record<string, string> = { SGD: "S$", USD: "US$", GBP: "£", EUR: "€", AUD: "A$", MYR: "RM", HKD: "HK$" };
+const SYMBOLS: Record<string, string> = { SGD: "S$", USD: "US$", GBP: "£", EUR: "€", AUD: "A$", CAD: "C$", MYR: "RM", HKD: "HK$" };
 
 export function money(amount: number | undefined | null, currency: string) {
   if (amount == null || Number.isNaN(amount)) return "—";

@@ -23,6 +23,7 @@ export type CatalogModel = {
   remoteImage?: string;
   /** Extra stock photos beyond the main one. */
   gallery?: string[];
+  remoteGallery?: string[];
   description?: string;
   prices?: Price[];
   /** Photos uploaded by the collector for this model (kept with the model, not the collection entry). */

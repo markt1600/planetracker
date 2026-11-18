@@ -17,7 +17,7 @@ export default async function CatalogPage() {
         <p className="label">Reference · updated {meta.builtAt}</p>
         <h1 className="mt-1 font-display text-4xl tracking-tight">The catalogue</h1>
         <p className="mt-2 max-w-2xl text-mute">
-          {meta.count.toLocaleString("en")} die-cast models from {meta.brands.join(", ")}.
+          {meta.count.toLocaleString("en")} die-cast models from {meta.brands.length} manufacturers, including {meta.brands.slice(0, 8).join(", ")}.
         </p>
       </header>
       <CatalogBrowser brands={f.brands} scales={f.scales} families={f.families} currency={store.settings.currency} toSGD={fx.toSGD} />

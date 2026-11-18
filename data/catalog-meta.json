@@ -1,6 +1,6 @@
 {
   "builtAt": "2026-11-18",
-  "count": 3653,
+  "count": 4292,
   "brands": [
     "GeminiJets",
     "JC Wings",
@@ -9,7 +9,19 @@
     "InFlight200",
     "Herpa Wings",
     "Phoenix Models",
-    "AeroClassics"
+    "AeroClassics",
+    "Panda Models",
+    "SQ Wings",
+    "HX Wings",
+    "Aero Polaris",
+    "C Models",
+    "Big Bird",
+    "V1 Models",
+    "YU Model",
+    "Patriot Models",
+    "HYJL Wings",
+    "Dragon Wings",
+    "Apollo"
   ],
   "fx": {
     "base": "SGD",
@@ -20,6 +32,7 @@
       "USD": 1.2888,
       "EUR": 1.4163,
       "AUD": 0.8681,
+      "CAD": 0.9019,
       "MYR": 0.3149,
       "HKD": 0.1643
     }
@@ -27,6 +40,7 @@
   "sources": [
     "airplanemodelsg.com",
     "aviationretaildirect.com",
-    "airplaneshop.com"
+    "airplaneshop.com",
+    "westcoastdiecast.ca"
   ]
 }
