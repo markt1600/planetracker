@@ -166,7 +166,16 @@ async function newestVersion() {
  * Read-modify-write helper. Always reads fresh. If two people save at nearly the same moment, the later one
  * notices the other's save and re-applies its change on top, instead of silently undoing it.
  */
-export async function updateStore<T>(fn: (doc: StoreDoc) => T | Promise<T>) {
+export function updateStore<T>(fn: (doc: StoreDoc) => T | Promise<T>): Promise<T> {
+  // Saves handled by the same server instance run strictly one after another.
+  const run = queue.then(() => applyUpdate(fn));
+  queue = run.catch(() => {});
+  return run;
+}
+
+let queue: Promise<unknown> = Promise.resolve();
+
+async function applyUpdate<T>(fn: (doc: StoreDoc) => T | Promise<T>) {
   for (let attempt = 0; ; attempt++) {
     const before = await newestVersion();
     const doc = await loadStore();
