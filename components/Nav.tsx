@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/collection", label: "Collection" },
   { href: "/airport", label: "3D view" },
   { href: "/catalog", label: "Catalogue" },
+  { href: "/wishlist", label: "Wishlist" },
 ];
 
 export function PlaneMark({ className = "" }: { className?: string }) {
@@ -34,7 +35,7 @@ export default function Nav({ owner, currency }: { owner: string; currency: stri
           {LINKS.map((l) => {
             const active = l.href === "/" ? path === "/" : path.startsWith(l.href) || (l.href === "/airport" && path.startsWith("/museum"));
             return (
-              <Link key={l.href} href={l.href} className={`hidden rounded-full px-3 py-1.5 transition sm:block ${active ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
+              <Link key={l.href} href={l.href} className={`hidden rounded-full px-3 py-1.5 transition lg:block ${active ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
                 {l.label}
               </Link>
             );
@@ -58,15 +59,15 @@ export default function Nav({ owner, currency }: { owner: string; currency: stri
             ))}
           </select>
           <Link href="/add" className="btn btn-primary ml-1 !py-2">
-            <span aria-hidden>+</span> Add a plane
+            <span aria-hidden>+</span> Add<span className="max-[359px]:hidden"> a plane</span>
           </Link>
         </nav>
       </div>
-      <nav className="flex border-t border-line/50 text-sm sm:hidden">
+      <nav className="flex border-t border-line/50 text-sm lg:hidden">
         {LINKS.map((l) => {
           const active = l.href === "/" ? path === "/" : path.startsWith(l.href) || (l.href === "/airport" && path.startsWith("/museum"));
           return (
-            <Link key={l.href} href={l.href} className={`flex-1 py-2 text-center ${active ? "text-amber" : "text-mute"}`}>
+            <Link key={l.href} href={l.href} className={`flex-1 whitespace-nowrap px-1 py-2 text-center text-[0.8rem] max-[359px]:text-[0.7rem] ${active ? "text-amber" : "text-mute"}`}>
               {l.label}
             </Link>
           );
