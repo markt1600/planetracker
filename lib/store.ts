@@ -1,6 +1,7 @@
 import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { cache } from "react";
 import { del, get, list, put } from "@vercel/blob";
 import type { StoreDoc } from "./types";
 
@@ -31,24 +32,36 @@ type Access = "public" | "private";
 /** Blob stores are created as either public or private; this is worked out on first use. */
 let accessMode: Access | null = (process.env.BLOB_ACCESS as Access | undefined) ?? null;
 
-/** Read one stored file whichever kind of store it is in. Returns null when it cannot be read. */
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Read one stored file. The public address is tried first; if storage refuses it (it has answered 403 for
+ * a minute or two at a time), the same file is read through the authenticated API instead, which does not
+ * go through the public CDN. Returns the text, or a description of what went wrong.
+ */
 async function readBlob(blob: { url: string; pathname: string }): Promise<{ text: string } | { error: string }> {
   const errors: string[] = [];
-  const order: Access[] = accessMode === "private" ? ["private", "public"] : ["public", "private"];
-  for (const access of order) {
+  const viaApi = (access: Access) => async () => {
+    const got = await get(blob.pathname, { access, useCache: false });
+    if (!got || got.statusCode !== 200) throw new Error("not found");
+    accessMode ??= access;
+    return new Response(got.stream).text();
+  };
+  const viaUrl = async () => {
+    const res = await fetch(blob.url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    accessMode ??= "public";
+    return res.text();
+  };
+  const attempts: [string, () => Promise<string>][] =
+    accessMode === "private"
+      ? [["private api", viaApi("private")], ["public url", viaUrl], ["public api", viaApi("public")]]
+      : [["public url", viaUrl], ["public api", viaApi("public")], ["public url retry", () => pause(400).then(viaUrl)], ["private api", viaApi("private")]];
+  for (const [label, attempt] of attempts) {
     try {
-      if (access === "public") {
-        const res = await fetch(blob.url, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        accessMode ??= "public";
-        return { text: await res.text() };
-      }
-      const got = await get(blob.pathname, { access: "private", useCache: false });
-      if (!got || got.statusCode !== 200) throw new Error("not found");
-      accessMode = "private";
-      return { text: await new Response(got.stream).text() };
+      return { text: await attempt() };
     } catch (e) {
-      errors.push(`${access}: ${(e as Error).name} ${(e as Error).message}`.replace(/https?:\/\/\S+/g, "<url>"));
+      errors.push(`${label}: ${(e as Error).message}`.replace(/https?:\/\/\S+/g, "<url>"));
     }
   }
   return { error: errors.join("; ") };
@@ -72,7 +85,7 @@ async function putBlob(pathname: string, body: string | Buffer, contentType: str
 
 const newestFirst = <T extends { pathname: string }>(blobs: T[]) => [...blobs].sort((a, b) => (a.pathname < b.pathname ? 1 : -1));
 
-export async function readStore(): Promise<StoreDoc> {
+async function loadStore(): Promise<StoreDoc> {
   if (blobEnabled()) {
     const { blobs } = await list({ prefix: PREFIX, limit: 100 });
     if (!blobs.length) return empty();
@@ -136,12 +149,32 @@ export async function storeStatus() {
   }
 }
 
-/** Read-modify-write helper. */
+/**
+ * The collection as saved. While a page is being rendered the result is shared, so the layout and the page
+ * read storage once between them instead of twice.
+ */
+export const readStore = cache(loadStore);
+
+/** Name of the most recent saved version, used to notice a save made by someone else in the meantime. */
+async function newestVersion() {
+  if (!blobEnabled()) return null;
+  const { blobs } = await list({ prefix: PREFIX, limit: 100 });
+  return newestFirst(blobs)[0]?.pathname ?? null;
+}
+
+/**
+ * Read-modify-write helper. Always reads fresh. If two people save at nearly the same moment, the later one
+ * notices the other's save and re-applies its change on top, instead of silently undoing it.
+ */
 export async function updateStore<T>(fn: (doc: StoreDoc) => T | Promise<T>) {
-  const doc = await readStore();
-  const result = await fn(doc);
-  await writeStore(doc);
-  return result;
+  for (let attempt = 0; ; attempt++) {
+    const before = await newestVersion();
+    const doc = await loadStore();
+    const result = await fn(doc);
+    if (attempt < 3 && (await newestVersion()) !== before) continue; // someone else saved; start again from their version
+    await writeStore(doc);
+    return result;
+  }
 }
 
 export async function savePhoto(data: Buffer, ext: "jpg" | "png" | "webp") {
