@@ -7,7 +7,9 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Collection" };
 
 export default async function CollectionPage({ searchParams }: PageProps<"/collection">) {
-  const { plane } = await searchParams;
+  const { plane, from } = await searchParams;
+  // Where "full details" was opened from, so closing it goes back there.
+  const returnTo = from === "airport" || from === "museum" ? from : undefined;
   const { store, models, stats, fx } = await loadCollection();
   return (
     <div className="space-y-6">
@@ -17,7 +19,7 @@ export default async function CollectionPage({ searchParams }: PageProps<"/colle
       </header>
       <Stats stats={stats} currency={store.settings.currency} detailed />
       <section>
-        <CollectionView items={store.items} models={models} photos={store.modelPhotos} history={store.priceHistory} currency={store.settings.currency} toSGD={fx.toSGD} openId={typeof plane === "string" ? plane : undefined} pricesCheckedAt={store.pricesCheckedAt} />
+        <CollectionView items={store.items} models={models} photos={store.modelPhotos} history={store.priceHistory} currency={store.settings.currency} toSGD={fx.toSGD} openId={typeof plane === "string" ? plane : undefined} returnTo={returnTo} pricesCheckedAt={store.pricesCheckedAt} />
       </section>
     </div>
   );

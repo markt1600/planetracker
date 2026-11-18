@@ -8,7 +8,8 @@ import { loadCollection } from "@/lib/view";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Airport" };
 
-export default async function AirportPage() {
+export default async function AirportPage({ searchParams }: PageProps<"/airport">) {
+  const { plane } = await searchParams;
   const { store, models, fx } = await loadCollection();
   const currency = store.settings.currency;
   const exhibits: Exhibit[] = store.items.map((i) => {
@@ -39,7 +40,7 @@ export default async function AirportPage() {
         </div>
         <ViewSwitch current="airport" />
       </header>
-      <Airport exhibits={exhibits} />
+      <Airport exhibits={exhibits} initial={typeof plane === "string" ? plane : undefined} />
     </div>
   );
 }

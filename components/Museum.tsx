@@ -12,10 +12,10 @@ import PlaneImage from "./PlaneImage";
 
 const PITCH = 17; // distance between plinths
 
-export default function Museum({ exhibits }: { exhibits: Exhibit[] }) {
+export default function Museum({ exhibits, initial }: { exhibits: Exhibit[]; initial?: string }) {
   const mount = useRef<HTMLDivElement>(null);
   const focus = useRef<(id: string | null) => void>(() => {});
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initial && exhibits.some((e) => e.id === initial) ? initial : null);
   const [failed, setFailed] = useState(false);
   const order = useMemo(() => [...exhibits].sort((a, b) => (a.airline ?? "~").localeCompare(b.airline ?? "~") || a.title.localeCompare(b.title)), [exhibits]);
   const current = order.find((e) => e.id === selected);
@@ -256,7 +256,7 @@ export default function Museum({ exhibits }: { exhibits: Exhibit[] }) {
           {sizeNote && <p className="mt-3 hidden text-sm text-mute sm:block">{sizeNote}</p>}
           {current.notes && <p className="mt-2 text-sm italic text-mute">“{current.notes}”</p>}
           <div className="mt-3 flex gap-2">
-            <Link href={`/collection?plane=${current.id}`} className="btn btn-primary flex-1 !py-2">Full details</Link>
+            <Link href={`/collection?plane=${current.id}&from=museum`} className="btn btn-primary flex-1 !py-2">Full details</Link>
             <button className="btn btn-ghost !py-2" onClick={() => setSelected(null)}>Close</button>
           </div>
         </aside>

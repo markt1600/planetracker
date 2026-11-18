@@ -17,6 +17,8 @@ type Props = {
   currency: string;
   toSGD: Record<string, number>;
   openId?: string;
+  /** 3D view the details were opened from; closing them returns there with the same plane selected. */
+  returnTo?: "airport" | "museum";
   pricesCheckedAt?: string;
 };
 
@@ -209,7 +211,7 @@ function Detail({ item, model, photos, history, currency, toSGD, onClose }: { it
   );
 }
 
-export default function CollectionView({ items, models, photos, history, currency, toSGD, openId, pricesCheckedAt }: Props) {
+export default function CollectionView({ items, models, photos, history, currency, toSGD, openId, returnTo, pricesCheckedAt }: Props) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("");
@@ -247,7 +249,15 @@ export default function CollectionView({ items, models, photos, history, currenc
   }, [items, q, brand, sort, models, currency]);
 
   const openItem = items.find((i) => i.id === open);
-  const close = () => { setOpen(null); window.history.replaceState(null, "", "/collection"); };
+  const close = () => {
+    if (returnTo && open === openId) {
+      const stillThere = items.some((i) => i.id === open);
+      router.push(stillThere ? `/${returnTo}?plane=${open}` : `/${returnTo}`);
+      return;
+    }
+    setOpen(null);
+    window.history.replaceState(null, "", "/collection");
+  };
 
   if (!items.length) {
     return (
