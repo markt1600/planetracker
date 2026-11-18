@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-display), var(--font-geist-sans), ui-sans-serif, sans-serif;
+
+  --color-night: #070b14;
+  --color-deep: #0b1220;
+  --color-panel: #111a2c;
+  --color-raised: #17233a;
+  --color-line: #233250;
+  --color-ink: #eef2f8;
+  --color-mute: #93a1ba;
+  --color-faint: #5f6f8c;
+  --color-amber: #f6b84b;
+  --color-amber-deep: #d99622;
+  --color-sky: #7cc6ff;
+  --color-good: #5fd39a;
+  --color-bad: #ff8a80;
+  --color-studio: #eef1f5;
+}
+
+html {
+  background: var(--color-night);
+  color-scheme: dark;
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1100px 520px at 82% -8%, rgb(124 198 255 / 0.13), transparent 62%),
+    radial-gradient(900px 480px at 0% 0%, rgb(246 184 75 / 0.07), transparent 60%),
+    var(--color-night);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(246 184 75 / 0.35);
+}
+
+/* Small uppercase labels, like the legends on a flight deck. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+
+.panel {
+  background: linear-gradient(180deg, rgb(23 35 58 / 0.72), rgb(17 26 44 / 0.72));
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(8px);
+}
+
+.studio {
+  background: radial-gradient(120% 90% at 50% 20%, #ffffff, var(--color-studio) 60%, #d8dee8);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: transform 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: linear-gradient(180deg, var(--color-amber), var(--color-amber-deep));
+  color: #1b1304;
+  box-shadow: 0 8px 24px -10px rgb(246 184 75 / 0.7);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.btn-ghost {
+  border: 1px solid var(--color-line);
+  color: var(--color-ink);
+  background: rgb(23 35 58 / 0.5);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--color-sky);
+}
+.btn-danger {
+  border: 1px solid rgb(255 138 128 / 0.4);
+  color: var(--color-bad);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.8rem;
+  border: 1px solid var(--color-line);
+  background: rgb(7 11 20 / 0.6);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field::placeholder {
+  color: var(--color-faint);
+}
+.field:focus {
+  border-color: var(--color-sky);
+  box-shadow: 0 0 0 3px rgb(124 198 255 / 0.18);
+}
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%2393a1ba' stroke-width='2'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.2rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  padding: 0.2rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--color-mute);
+  white-space: nowrap;
+}
+.chip-amber {
+  border-color: rgb(246 184 75 / 0.45);
+  color: var(--color-amber);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes drift {
+  from {
+    transform: translateX(-6px) translateY(3px);
+  }
+  to {
+    transform: translateX(6px) translateY(-3px);
+  }
+}
+.drift {
+  animation: drift 7s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .drift {
+    animation: none;
+  }
+}
