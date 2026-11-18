@@ -104,6 +104,15 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
             <div className="grid md:grid-cols-2">
               <div>
                 <PlaneImage sources={[open.image, open.remoteImage]} alt={open.title} className="aspect-[4/3] sm:rounded-tl-3xl" />
+                {open.gallery && open.gallery.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 pb-0">
+                    {open.gallery.map((u) => (
+                      <a key={u} href={u} target="_blank" rel="noreferrer">
+                        <PlaneImage sources={[u]} alt="More views" fit="cover" className="h-16 w-20 rounded-lg" />
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {open.userPhotos && open.userPhotos.length > 0 && (
                   <div className="p-3">
                     <p className="label">Collector photos</p>

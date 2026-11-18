@@ -37,7 +37,7 @@ function Sparkline({ points }: { points: PricePoint[] }) {
 
 function Detail({ item, model, photos, history, currency, toSGD, onClose }: { item: CollectionItem; model?: CatalogModel; photos: string[]; history: PricePoint[]; currency: string; toSGD: Record<string, number>; onClose: () => void }) {
   const router = useRouter();
-  const gallery = [...[...photos].reverse().map((url) => ({ url, own: true })), ...(model?.image || item.image ? [{ url: (model?.image ?? item.image)!, own: false }] : [])];
+  const gallery = [...[...photos].reverse().map((url) => ({ url, own: true })), ...(model?.image || item.image ? [{ url: (model?.image ?? item.image)!, own: false }] : []), ...(model?.gallery ?? []).map((url) => ({ url, own: false }))];
   const [shown, setShown] = useState(0);
   const [price, setPrice] = useState(item.pricePaid != null ? String(item.pricePaid) : "");
   const [cur, setCur] = useState(item.currency);

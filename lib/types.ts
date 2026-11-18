@@ -21,6 +21,8 @@ export type CatalogModel = {
   notes?: string;
   image?: string;
   remoteImage?: string;
+  /** Extra stock photos beyond the main one. */
+  gallery?: string[];
   description?: string;
   prices?: Price[];
   /** Photos uploaded by the collector for this model (kept with the model, not the collection entry). */

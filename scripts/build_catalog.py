@@ -442,6 +442,13 @@ def main():
                "image": f"/catalog/{slug}.webp" if os.path.exists(os.path.join(ROOT, "public", "catalog", slug + ".webp")) else m["image"],
                "description": m["description"], "prices": m["prices"]}
         out.append({a: b for a, b in rec.items() if b not in (None, "", [])})
+    # Hand-added models (data/catalog-extra.json) are kept across rebuilds and win over scraped records.
+    extra_path = os.path.join(OUT, "catalog-extra.json")
+    if os.path.exists(extra_path):
+        extras = json.load(open(extra_path))
+        ids = {e["id"] for e in extras}
+        out = [r for r in out if r["id"] not in ids] + extras
+        print("extras", len(extras))
     out.sort(key=lambda r: (BRANDS.index(r["brand"]), r["modelNumber"]))
 
     os.makedirs(OUT, exist_ok=True)
