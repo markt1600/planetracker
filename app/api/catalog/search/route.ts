@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     brand: p.get("brand") || undefined,
     scale: p.get("scale") || undefined,
     family: p.get("family") || undefined,
+    airline: p.get("airline") || undefined,
     limit,
     offset,
   });

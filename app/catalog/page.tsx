@@ -25,7 +25,7 @@ export default async function CatalogPage() {
           ♡ Wishlist ({store.wishlist.length}/{WISHLIST_MAX})
         </Link>
       </header>
-      <CatalogBrowser brands={f.brands} scales={f.scales} families={f.families} currency={store.settings.currency} toSGD={fx.toSGD} />
+      <CatalogBrowser brands={f.brands} scales={f.scales} families={f.families} airlines={f.airlines} currency={store.settings.currency} toSGD={fx.toSGD} />
     </div>
   );
 }

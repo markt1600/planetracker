@@ -33,9 +33,10 @@ export const catalogMeta = () => load().meta;
 export const getModel = (id: string, custom: CatalogModel[] = []) => load().byId.get(id) ?? custom.find((m) => m.id === id);
 export const allModels = () => load().models;
 
-export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; limit?: number; offset?: number; custom?: CatalogModel[] };
+export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; airline?: string; limit?: number; offset?: number; custom?: CatalogModel[] };
 
-export function searchCatalog({ q = "", brand, scale, family, limit = 24, offset = 0, custom = [] }: SearchOptions) {
+export function searchCatalog({ q = "", brand, scale, family, airline = "", limit = 24, offset = 0, custom = [] }: SearchOptions) {
+  const wanted = airline.toLowerCase().split(/\s+/).filter(Boolean);
   const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
   const qNum = squash(q);
   const scored: { model: CatalogModel; score: number }[] = [];
@@ -45,6 +46,8 @@ export function searchCatalog({ q = "", brand, scale, family, limit = 24, offset
     if (brand && m.brand !== brand) continue;
     if (scale && m.scale !== scale) continue;
     if (family && m.family !== family) continue;
+    // Airline names vary between retailers ("Delta", "Delta Air Lines"), so match on the words typed.
+    if (wanted.length && !wanted.every((w) => (m.airline ?? "").toLowerCase().includes(w))) continue;
     let score = 0;
     if (tokens.length) {
       if (qNum.length >= 3 && entry.num === qNum) score += 100;
@@ -63,6 +66,12 @@ export function searchCatalog({ q = "", brand, scale, family, limit = 24, offset
   return { total: scored.length, results: scored.slice(offset, offset + limit).map((s) => s.model) };
 }
 
+function airlines() {
+  const map = new Map<string, number>();
+  for (const m of load().models) if (m.airline) map.set(m.airline, (map.get(m.airline) ?? 0) + 1);
+  return [...map.entries()].map(([value, n]) => ({ value, n }));
+}
+
 export function facets() {
   const { models, meta } = load();
   const count = (key: "scale" | "family" | "brand") => {
@@ -78,6 +87,10 @@ export function facets() {
     brands: meta.brands.map((b) => ({ value: b, n: brands.find((x) => x.value === b)?.n ?? 0 })),
     scales: count("scale"),
     families: count("family"),
+    // Airlines with at least two models, A–Z, as suggestions for the airline filter.
+    airlines: airlines()
+      .filter((a) => a.n >= 2)
+      .sort((a, b) => a.value.localeCompare(b.value)),
   };
 }
 

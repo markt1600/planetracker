@@ -12,11 +12,12 @@ type Result = CatalogModel & { owned?: boolean; wished?: boolean };
 type Wish = { catalogId: string; model: CatalogModel };
 const PAGE = 36;
 
-export default function CatalogBrowser({ brands, scales, families, currency, toSGD }: { brands: Facet[]; scales: Facet[]; families: Facet[]; currency: string; toSGD: Record<string, number> }) {
+export default function CatalogBrowser({ brands, scales, families, airlines, currency, toSGD }: { brands: Facet[]; scales: Facet[]; families: Facet[]; airlines: Facet[]; currency: string; toSGD: Record<string, number> }) {
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("");
   const [scale, setScale] = useState("");
   const [family, setFamily] = useState("");
+  const [airline, setAirline] = useState("");
   const [data, setData] = useState<{ key: string; total: number; results: Result[] }>({ key: "", total: 0, results: [] });
   const [more, setMore] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,7 +57,7 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
     }
   };
 
-  const key = JSON.stringify([q, brand, scale, family]);
+  const key = JSON.stringify([q, brand, scale, family, airline]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -66,7 +67,7 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams({ q, brand, scale, family, limit: String(PAGE), offset: String(offset) });
+        const params = new URLSearchParams({ q, brand, scale, family, airline, limit: String(PAGE), offset: String(offset) });
         const res = await api<{ total: number; results: Result[] }>(`/api/catalog/search?${params}`, { signal: ctrl.signal });
         setData((d) => ({ key, total: res.total, results: fresh ? res.results : [...d.results, ...res.results] }));
         setLoading(false);
@@ -99,6 +100,17 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
         {select("All manufacturers", brand, setBrand, brands)}
         {select("All scales", scale, setScale, scales)}
         {select("All aircraft", family, setFamily, families)}
+        <div className="relative col-span-2 sm:col-span-1 sm:w-56">
+          <input className="field pr-8" list="catalogue-airlines" placeholder="Any airline" value={airline} onChange={(e) => setAirline(e.target.value)} aria-label="Airline" autoComplete="off" />
+          {airline && (
+            <button type="button" onClick={() => setAirline("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-1.5 text-mute hover:text-ink" aria-label="Clear airline">✕</button>
+          )}
+          <datalist id="catalogue-airlines">
+            {airlines.map((a) => (
+              <option key={a.value} value={a.value}>{`${a.n} models`}</option>
+            ))}
+          </datalist>
+        </div>
       </div>
       <p className="label mt-4">{data.key === key ? `${data.total.toLocaleString("en")} models` : "Searching…"}</p>
 
