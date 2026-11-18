@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { deletePhoto, readLocalPhoto, savePhoto, updateStore } from "@/lib/store";
+import { deletePhoto, readLocalPhoto, readPrivatePhoto, savePhoto, updateStore } from "@/lib/store";
 
 const TYPES: Record<string, "jpg" | "png" | "webp"> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -38,9 +38,16 @@ export async function DELETE(request: Request) {
   return Response.json({ photos });
 }
 
-/** Local development only: photos are served from ./.data when no Blob store is configured. */
+/** Serves photos that have no public address: ones in a private Blob store, and local-development files. */
 export async function GET(request: Request) {
-  const name = new URL(request.url).searchParams.get("f") ?? "";
+  const params = new URL(request.url).searchParams;
+  const pathname = params.get("p");
+  if (pathname) {
+    const photo = await readPrivatePhoto(pathname);
+    if (!photo) return new Response("Not found", { status: 404 });
+    return new Response(photo.stream, { headers: { "Content-Type": photo.contentType, "Cache-Control": "public, max-age=31536000, immutable" } });
+  }
+  const name = params.get("f") ?? "";
   const data = await readLocalPhoto(name);
   if (!data) return new Response("Not found", { status: 404 });
   const ext = name.split(".").pop();
