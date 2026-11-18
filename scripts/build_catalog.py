@@ -6,6 +6,7 @@ Sources (all public storefront product feeds):
   ard   aviationretaildirect.com  Shopify products.json   prices in GBP
   tas   airplaneshop.com          Shopify products.json   prices in USD
   wcd   westcoastdiecast.ca       Shopify products.json   prices in CAD
+  sms   scalemodelstore.com       model pages (run scripts/fetch_scalemodelstore.py)   prices in EUR
 
 Usage:
   python3 scripts/build_catalog.py           # rebuild from .cache/catalog-raw
@@ -33,6 +34,9 @@ BRANDS = [
     # Further manufacturers carried by the source retailers.
     "Panda Models", "SQ Wings", "HX Wings", "Aero Polaris", "C Models", "Big Bird", "V1 Models",
     "YU Model", "Patriot Models", "HYJL Wings", "Dragon Wings", "Apollo",
+    "Hobby Master", "B Models", "KJ Models", "WLTK", "Aether Model", "Kylin Model", "El Aviador", "Legacy Jets",
+    "JFox", "JetX", "Retro Models", "Fantasy Wings", "Hogan", "Limox", "ODEWM", "Oxford Aviation", "Postage Stamp",
+    "AviaBoss", "ARD Models",
 ]
 MORE_BRANDS = (("panda", "Panda Models"), ("sq wings", "SQ Wings"), ("hx ", "HX Wings"), ("aeropolaris", "Aero Polaris"),
                ("aero polaris", "Aero Polaris"), ("^c model", "C Models"), ("big bird", "Big Bird"), ("v1 models", "V1 Models"),
@@ -397,6 +401,61 @@ def rec_shopify(p, source, currency, base):
                 description=strip_html(p.get("body_html"))[:400] or None, price=price, **info)
 
 
+SMS_BRANDS = {
+    "JC Wings": "JC Wings", "NG Models": "NG Models", "NG Lite": "NG Models", "Inflight200": "InFlight200",
+    "GeminiJets": "GeminiJets", "Herpa Wings": "Herpa Wings", "Aviation400": "Aviation 400", "Aviation200": "Aviation 400",
+    "Apollo": "Apollo", "Aero Polaris": "Aero Polaris", "Panda Models": "Panda Models", "V1:400": "V1 Models",
+    "Yu ModeL": "YU Model", "Hobby Master": "Hobby Master", "B Models": "B Models", "KJ Models": "KJ Models",
+    "WLTK": "WLTK", "Aether Model": "Aether Model", "Kylin Model": "Kylin Model", "El Aviador": "El Aviador",
+    "Legacy Jets": "Legacy Jets", "Other (JFox)": "JFox", "Other (JetX)": "JetX", "Retro Models": "Retro Models",
+    "Fantasy Wings": "Fantasy Wings", "Hogan": "Hogan", "Limox": "Limox", "ODEWM": "ODEWM",
+    "Oxford Aviation": "Oxford Aviation", "Postage Stamp": "Postage Stamp", "AviaBoss": "AviaBoss", "ARD": "ARD Models",
+    "Phoenix": "Phoenix Models", "Phoenix Models": "Phoenix Models", "Aeroclassics": "AeroClassics", "Big Bird": "Big Bird",
+    "Dragon Wings": "Dragon Wings", "SQ Wings": "SQ Wings", "HX Models": "HX Wings", "C Models": "C Models",
+}
+
+
+def rec_sms(r):
+    """One scalemodelstore.com model page (already reduced to fields by fetch_scalemodelstore.py)."""
+    brand = SMS_BRANDS.get((r.get("brand") or "").strip())
+    number = clean(r.get("mpn") or "").upper()
+    if not brand or len(number) < 3 or "error" in r:
+        return None
+    parts = [x.strip() for x in (r.get("detail") or "").split("|")]
+    airline = parts[1] if len(parts) > 2 else None
+    kind = parts[2] if len(parts) > 2 else None
+    name = clean(r.get("name") or "")
+    if not airline or not kind or f"{airline} {kind}" != name:
+        airline, kind = None, name
+    m = re.search(r"\b1:(\d+)\b", r.get("title") or "")
+    if not m or ACCESSORY_RE.search(name):
+        return None
+    # Remarks (registration, livery, squadron) sit between the announcement date and the price.
+    remarks = []
+    detail = r.get("detail") or ""
+    rm = re.search(r"Brochure / announcement: \|[^|]*\|(.*?)\|Our price", detail)
+    if rm:
+        remarks = [x.strip() for x in rm.group(1).split("|") if x.strip()]
+    reg = next((x for x in remarks if REG_RE.fullmatch(x) and not NOT_REG.match(x)), None)
+    notes = [x for x in remarks if x != reg and len(x) < 90]
+    t = find_type(kind)
+    if brand == "NG Models" and number.isdigit(): number = "NG" + number
+    if brand == "Phoenix Models" and number.isdigit(): number = "PH" + number
+    title = " ".join(x for x in [name, f'"{notes[0].title() if notes[0].isupper() else notes[0]}"' if notes else None, reg] if x)
+    imgs = ["https://www.scalemodelstore.com" + i for i in (r.get("images") or [])]
+    price = {"source": "ScaleModelStore", "amount": r["eur"], "currency": "EUR", "url": r["url"],
+             "inStock": bool(r.get("inStock"))} if r.get("eur") else None
+    return dict(brand=brand, number=number, scale="1:" + m.group(1), title=title, image=imgs[0] if imgs else None,
+                thumb=None, more=[], description=None, price=price, type=tidy_type(t[1].group(0)) if t else clean(kind)[:40],
+                family=t[0] if t else None, reg=reg, airline=tidy_airline(airline) if airline else None,
+                notes="; ".join(notes)[:160] or None)
+
+
+def load_sms():
+    path = os.path.join(RAW, "sms", "pages.jsonl")
+    return [json.loads(line) for line in open(path)] if os.path.exists(path) else []
+
+
 def load(sub, key=None):
     seen, out = set(), []
     for f in sorted(glob.glob(os.path.join(RAW, sub, "*.json"))):
@@ -442,7 +501,11 @@ def main():
     for p in load("wcd", "products"):
         r = rec_shopify(p, "wcd", "CAD", "https://westcoastdiecast.ca")
         if r: recs.append(r)
-    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd {len(recs) - n3}")
+    n4 = len(recs)
+    for p in load_sms():
+        r = rec_sms(p)
+        if r: recs.append(r)
+    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd {n4 - n3}, sms {len(recs) - n4}")
 
     merged = {}
     for r in recs:
@@ -491,7 +554,7 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     meta = {"builtAt": date.today().isoformat(), "count": len(out), "brands": BRANDS, "fx": fx_rates(),
-            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca"]}
+            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "scalemodelstore.com"]}
     json.dump(out, open(os.path.join(OUT, "catalog.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump(meta, open(os.path.join(OUT, "catalog-meta.json"), "w"), indent=2)
     from collections import Counter
