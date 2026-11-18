@@ -5,7 +5,7 @@ A tracker for a die-cast model aircraft collection, built with Next.js for Verce
 - **Hangar** – a featured plane that changes on every visit, with real-aircraft specs and facts, plus collection stats.
 - **Collection** – grid or sortable list of every plane, with per-plane notes, price paid, own photos, market price and price history.
 - **3D view** – two ways to walk around the collection: a Changi-inspired airport apron with every plane parked at its own stand, and a museum hall with each plane on a plinth. Both have a placard per plane; the models are generated from the aircraft type and airline colours.
-- **Catalogue** – about 4,300 models from GeminiJets, JC Wings, NG Models, Aviation 400, InFlight200, Herpa Wings, Phoenix Models, AeroClassics and a dozen smaller manufacturers, with photos (several per model where more than one retailer lists it) and retailer prices.
+- **Catalogue** – about 8,700 models from GeminiJets, JC Wings, NG Models, Aviation 400, InFlight200, Herpa Wings, Phoenix Models, AeroClassics and some thirty smaller manufacturers, with photos (several per model where more than one retailer lists it) and retailer prices.
 - **Add a plane** – pick a manufacturer and type to search, identify a plane from a photo (Claude Opus 5.5), or enter it by hand.
 
 ## Deploying to Vercel

@@ -1,6 +1,6 @@
 {
   "builtAt": "2026-11-18",
-  "count": 4292,
+  "count": 8712,
   "brands": [
     "GeminiJets",
     "JC Wings",
@@ -21,7 +21,26 @@
     "Patriot Models",
     "HYJL Wings",
     "Dragon Wings",
-    "Apollo"
+    "Apollo",
+    "Hobby Master",
+    "B Models",
+    "KJ Models",
+    "WLTK",
+    "Aether Model",
+    "Kylin Model",
+    "El Aviador",
+    "Legacy Jets",
+    "JFox",
+    "JetX",
+    "Retro Models",
+    "Fantasy Wings",
+    "Hogan",
+    "Limox",
+    "ODEWM",
+    "Oxford Aviation",
+    "Postage Stamp",
+    "AviaBoss",
+    "ARD Models"
   ],
   "fx": {
     "base": "SGD",
@@ -41,6 +60,7 @@
     "airplanemodelsg.com",
     "aviationretaildirect.com",
     "airplaneshop.com",
-    "westcoastdiecast.ca"
+    "westcoastdiecast.ca",
+    "scalemodelstore.com"
   ]
 }
