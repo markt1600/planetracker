@@ -6,6 +6,7 @@ Sources (all public storefront product feeds):
   ard   aviationretaildirect.com  Shopify products.json   prices in GBP
   tas   airplaneshop.com          Shopify products.json   prices in USD
   wcd   westcoastdiecast.ca       Shopify products.json   prices in CAD
+  ams   aircraftmodelstore.co.uk  Shopify products.json   prices in GBP (die-cast only)
   sms   scalemodelstore.com       model pages (run scripts/fetch_scalemodelstore.py)   prices in EUR
 
 Usage:
@@ -85,7 +86,7 @@ def fetch_shopify(sub, base, prefix):
 
 
 def fetch_all():
-    for sub in ("amsg", "ard", "tas", "wcd"):
+    for sub in ("amsg", "ard", "tas", "wcd", "ams"):
         for f in glob.glob(os.path.join(RAW, sub, "*.json")):
             os.remove(f)
     page = 1
@@ -102,6 +103,7 @@ def fetch_all():
         fetch_shopify("ard", f"https://www.aviationretaildirect.com/collections/{c}", f"col.{c}")
     fetch_shopify("tas", "https://www.airplaneshop.com", "all")
     fetch_shopify("wcd", "https://westcoastdiecast.ca", "all")
+    fetch_shopify("ams", "https://www.aircraftmodelstore.co.uk", "all")
 
 
 # ---------------------------------------------------------------- parsing
@@ -205,6 +207,7 @@ def tidy_airline(a):
     a = re.sub(r"[一-鿿぀-ヿ가-힯]+", " ", a)
     a = re.sub(r"\b(Reg(?:istration)?[:#.]?|REG#|With Stand|with stand|Polished|Flaps? Down|Dreamliner|Interactive Series|NEW MOULD|New Mould|w/ ?Winglets|"
                r"Winglets|W/GEAR|w/ ?gear|Limited Edition|Sharklets|Scimitars?|Ultimate Collection|ULTIMATE|Ultimate|With Antenna|Misc|COMAC|McDonnell Douglas|Lockheed|Bombardier)\b", " ", a, flags=re.I)
+    a = re.sub(r"\s+(Boeing|Airbus|BOEING|AIRBUS)\s*$", "", a)
     a = re.sub(r"\s+", " ", a).strip(" -|,;:#/.·’'")
     if len(a) < 2 or len(a) > 60 or re.fullmatch(r"[\d\W]+", a):
         return None
@@ -271,10 +274,70 @@ def brand_from_vendor(v):
 
 def norm_key(brand, number):
     k = re.sub(r"[^A-Z0-9]", "", number.upper())
-    if brand == "Phoenix Models": k = re.sub(r"^PH(?=\d)", "", k)
-    if brand == "NG Models": k = re.sub(r"^NG(?=\d)", "", k)
+    # Retailers write the same model number differently; these rules make them meet.
+    if brand == "Phoenix Models": k = re.sub(r"^PH(?=\d)", "", k).lstrip("0")  # PH04737 / PH4737 / 04737
+    if brand == "NG Models": k = re.sub(r"^NG(?=\d)", "", k).lstrip("0")  # NG04006 / NG4006 / 04006
     if brand == "Herpa Wings": k = re.sub(r"^HE(?=\d)", "", k)
+    if brand == "Panda Models": k = re.sub(r"^PM(?=\d)", "", k)  # PM62421 / 62421
+    if brand == "YU Model": k = re.sub(r"^(YU400|YU|Y)(?=\d)", "", k)  # YU40030001 / Y30001 / 30001
+    if brand == "JC Wings": k = re.sub(r"^(JC|X)(?=\d)", "XX", k)  # JC4430 / X40020 are XX numbers
+    if brand == "Aviation 400": k = re.sub(r"^(AV|WB)(?=\d)", "", k)  # AV4077 / WB4077
     return brand + "|" + k
+
+
+def true_brand(brand, number):
+    """Some retailers file a model under a sister brand; the number format says who really made it."""
+    n = re.sub(r"[^A-Z0-9]", "", number.upper())
+    if n.startswith("KJ"): return "KJ Models"
+    if re.match(r"^L2\d{3}", n) and brand in ("JC Wings", "SQ Wings"): return "SQ Wings"
+    if re.match(r"^5\d{5}(\d{3})?$", n) and brand == "JC Wings": return "Herpa Wings"
+    if re.match(r"^C0\d{3}", n) and brand in ("Panda Models", "Aero Polaris", "C Models"): return "C Models"
+    if re.match(r"^HA\d{6,}", n) and brand in ("NG Models", "Aero Polaris", "HYJL Wings"): return "Aero Polaris"  # HYJL is the same maker
+    return brand
+
+
+GEMINI_NUM = re.compile(r"^(GJ|G2|GM|G5|GS)([A-Z]{2,4})?(\d{2,}[A-Z]*)$")
+
+
+def gemini_keys(recs):
+    """Work out which GeminiJets spellings are the same model.
+
+    The full number carries an airline code (GJTAM2062); some shops drop it (GJ2062) or mistype it
+    (GJSSO2014 / GJSOO2014). The digits are usually unique, but not always (GJDAL2294 is a Delta A321neo,
+    GJGTI2294 an Atlas 777), so spellings are only joined when the registration agrees or there is
+    exactly one coded model with those digits.
+    """
+    coded = {}  # prefix+digits -> list of clusters, each {"key": first spelling, "regs": set, "types": set}
+    plain = lambda n: re.sub(r"[^A-Z0-9]", "", n.upper())
+    for r in recs:
+        m = GEMINI_NUM.match(plain(r["number"])) if r["brand"] == "GeminiJets" else None
+        if not m or not m.group(2):
+            continue
+        clusters = coded.setdefault(m.group(1) + m.group(3), [])
+        hit = next((c for c in clusters if plain(r["number"]) in c["names"] or (r.get("reg") and r["reg"] in c["regs"])), None)
+        if not hit:
+            hit = {"key": plain(r["number"]), "names": set(), "regs": set(), "types": set()}
+            clusters.append(hit)
+        hit["names"].add(plain(r["number"]))
+        if r.get("reg"): hit["regs"].add(r["reg"])
+        if r.get("family"): hit["types"].add(r["family"])
+    for r in recs:
+        m = GEMINI_NUM.match(plain(r["number"])) if r["brand"] == "GeminiJets" else None
+        if not m:
+            continue
+        clusters = coded.get(m.group(1) + m.group(3), [])
+        if m.group(2):
+            hit = next(c for c in clusters if plain(r["number"]) in c["names"])
+        else:
+            hit = (clusters[0] if len(clusters) == 1 else
+                   next((c for c in clusters if r.get("reg") and r["reg"] in c["regs"]), None) or
+                   next((c for c in clusters if r.get("family") and r["family"] in c["types"]), None))
+        if hit:
+            r["key_number"] = hit["key"]
+
+
+def slug_of(brand, number):
+    return re.sub(r"[^a-z0-9]+", "-", (brand + "-" + number).lower()).strip("-")
 
 
 def line_for(brand, number, scale):
@@ -364,6 +427,25 @@ def rec_shopify(p, source, currency, base):
         sm = next((re.match(r"1/(\d+)$", t) for t in tags if re.match(r"1/\d+$", t)), None) or re.search(r"\b1/(\d+)\b", title)
         scale = "1:" + sm.group(1) if sm else None
         info = parse(desc, airline_first=True)
+    elif source == "ams":
+        # "<Brand> <Airline> <Type> <Reg> ... 1/400 Aircraft Scale Model"; plastic kits and gifts are tagged otherwise.
+        if "Diecast Models" not in tags or not sku:
+            return None
+        vendor = (p.get("vendor") or "").lower()
+        brand = {"ng models": "NG Models", "geminijets": "GeminiJets", "phoenix": "Phoenix Models", "herpa": "Herpa Wings",
+                 "sq wings": "SQ Wings", "aviation400": "Aviation 400", "aviation200": "Aviation 400", "hx models": "HX Wings",
+                 "jc wings": "JC Wings", "hogan": "Hogan", "fantasy wings": "Fantasy Wings", "postage stamp": "Postage Stamp"}.get(vendor)
+        if not brand:
+            return None
+        number = sku.upper()
+        if brand == "NG Models" and number.isdigit(): number = "NG" + number
+        if brand == "Phoenix Models" and number.isdigit(): number = "PH" + number
+        sm = re.search(r"\b1/(\d+)\b", title)
+        scale = "1:" + sm.group(1) if sm else None
+        desc = re.sub(r"\s*\b1/\d+\b.*$", "", title)
+        desc = re.sub(r"\s*Aircraft Scale Model\s*$", "", desc, flags=re.I)
+        desc = re.sub(r"^(NG Models|GeminiJets|Gemini Jets|Phoenix|Herpa Wings|Herpa|SQ Wings|Aviation ?[24]00|HX Models|JC Wings|Hogan Wings|Hogan|Fantasy Wings|Postage Stamp)\s+", "", desc, flags=re.I).strip()
+        info = parse(desc, airline_first=True)
     else:
         m = re.match(r"^(GEMINI200|GEMINIMACS|GEMINI|HERPA|INFLIGHT200)\s+(.*)$", title)
         if not m or p.get("product_type") not in ("AIRCRAFT", ""):
@@ -389,12 +471,12 @@ def rec_shopify(p, source, currency, base):
     imgs = p.get("images") or []
     image = shopify_img(imgs[0]["src"], 800) if imgs else None
     thumb = shopify_img(imgs[0]["src"], 360) if imgs else None
-    more = [shopify_img(i["src"], 800) for i in imgs[1:2]] if source == "wcd" else []
+    more = [shopify_img(i["src"], 800) for i in imgs[1:2]] if source in ("wcd", "ams") else []
     try:
         amt = float(v.get("price") or 0)
     except ValueError:
         amt = 0
-    name = {"ard": "Aviation Retail Direct", "tas": "The Airplane Shop", "wcd": "West Coast Diecast"}[source]
+    name = {"ard": "Aviation Retail Direct", "tas": "The Airplane Shop", "wcd": "West Coast Diecast", "ams": "Aircraft Model Store"}[source]
     price = {"source": name, "amount": amt, "currency": currency,
              "url": f"{base}/products/{p['handle']}", "inStock": bool(v.get("available"))} if amt > 0 else None
     return dict(brand=brand, number=number, scale=scale, title=desc, image=image, thumb=thumb, more=more,
@@ -501,22 +583,35 @@ def main():
     for p in load("wcd", "products"):
         r = rec_shopify(p, "wcd", "CAD", "https://westcoastdiecast.ca")
         if r: recs.append(r)
+    for p in load("ams", "products"):
+        r = rec_shopify(p, "ams", "GBP", "https://www.aircraftmodelstore.co.uk")
+        if r: recs.append(r)
     n4 = len(recs)
     for p in load_sms():
         r = rec_sms(p)
         if r: recs.append(r)
-    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd {n4 - n3}, sms {len(recs) - n4}")
+    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd+ams {n4 - n3}, sms {len(recs) - n4}")
 
     merged = {}
+    gemini_keys(recs)
     for r in recs:
+        filed_as = slug_of(r["brand"], r["number"])
+        r["brand"] = true_brand(r["brand"], r["number"])
         r["scale"] = r["scale"] or DEFAULT_SCALE.get(r["brand"])
-        k = norm_key(r["brand"], r["number"])
+        k = norm_key(r["brand"], r.get("key_number") or r["number"])
         price = r.pop("price")
         if k not in merged:
             m = merged[k] = dict(r)
             m["prices"] = []
+            m["display"] = r["number"]
+            m["spellings"] = {filed_as}
+            m["numbers"] = {r["number"]}
         else:
             m = merged[k]
+            m["spellings"].add(filed_as)
+            m["numbers"].add(r["number"])
+            # Show the fullest spelling of the number (e.g. with GeminiJets' airline code).
+            if len(r["number"]) > len(m["display"]): m["display"] = r["number"]
             # A second retailer's photo of the same model is kept as an extra picture.
             if m.get("image") and r.get("image") and r["image"] != m["image"]:
                 m.setdefault("extra", []).append(r["image"])
@@ -528,16 +623,21 @@ def main():
             m["prices"].append(price)
 
     out = []
+    aliases = {}
     for k, m in merged.items():
         if not m["scale"]:
             continue
-        slug = re.sub(r"[^a-z0-9]+", "-", (m["brand"] + "-" + m["number"]).lower()).strip("-")
-        rec = {"id": slug, "brand": m["brand"], "modelNumber": m["number"], "scale": m["scale"],
+        slug = slug_of(m["brand"], m["number"])
+        # Other spellings used to be separate entries; point their old ids at this one.
+        for other in m["spellings"]:
+            if other != slug: aliases[other] = slug
+        rec = {"id": slug, "brand": m["brand"], "modelNumber": m["display"], "scale": m["scale"],
                "line": line_for(m["brand"], m["number"], m["scale"]), "title": m["title"],
                "airline": m["airline"], "aircraft": m["type"], "family": m["family"],
                "registration": m["reg"], "notes": m["notes"], "remoteImage": m["image"],
                "image": f"/catalog/{slug}.webp" if os.path.exists(os.path.join(ROOT, "public", "catalog", slug + ".webp")) else m["image"],
                "description": m["description"], "prices": m["prices"]}
+        rec["aka"] = sorted(n for n in m["numbers"] if n != m["display"])
         extra = list(dict.fromkeys(m.get("extra") or []))[:3]
         rec["remoteGallery"] = extra
         rec["gallery"] = [f"/catalog/{slug}-{n + 2}.webp" for n in range(len(extra))
@@ -554,9 +654,11 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     meta = {"builtAt": date.today().isoformat(), "count": len(out), "brands": BRANDS, "fx": fx_rates(),
-            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "scalemodelstore.com"]}
+            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "aircraftmodelstore.co.uk", "scalemodelstore.com"]}
     json.dump(out, open(os.path.join(OUT, "catalog.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump(meta, open(os.path.join(OUT, "catalog-meta.json"), "w"), indent=2)
+    ids = {r["id"] for r in out}
+    json.dump({k: v for k, v in sorted(aliases.items()) if k not in ids}, open(os.path.join(OUT, "catalog-aliases.json"), "w"), indent=0)
     from collections import Counter
     print("total", len(out))
     for label, fn in [("brand", lambda r: r["brand"]), ("scale", lambda r: r["scale"])]:

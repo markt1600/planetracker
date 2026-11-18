@@ -31,7 +31,7 @@ Notes are stored only on the collection entry. Own photos are stored against the
 
 ## Prices
 
-Airplane Model SG is the preferred price source; Aviation Retail Direct (GBP), The Airplane Shop (USD), West Coast Diecast (CAD) and ScaleModelStore (EUR) fill in the rest.
+Airplane Model SG is the preferred price source; Aviation Retail Direct (GBP), The Airplane Shop (USD), West Coast Diecast (CAD), Aircraft Model Store (GBP) and ScaleModelStore (EUR) fill in the rest.
 Everything is shown in the display currency chosen in the header, converted with daily European Central Bank reference rates.
 A daily job re-reads Airplane Model SG prices for the planes in the collection and records changes.
 

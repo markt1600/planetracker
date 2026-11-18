@@ -1,6 +1,6 @@
 {
   "builtAt": "2026-11-18",
-  "count": 8712,
+  "count": 8710,
   "brands": [
     "GeminiJets",
     "JC Wings",
@@ -44,15 +44,15 @@
   ],
   "fx": {
     "base": "SGD",
-    "asOf": "2026-11-17",
+    "asOf": "2026-11-18",
     "toSGD": {
       "SGD": 1.0,
-      "GBP": 1.7001,
-      "USD": 1.2888,
-      "EUR": 1.4163,
+      "GBP": 1.6982,
+      "USD": 1.2896,
+      "EUR": 1.4144,
       "AUD": 0.8681,
-      "CAD": 0.9019,
-      "MYR": 0.3149,
+      "CAD": 0.9015,
+      "MYR": 0.3133,
       "HKD": 0.1643
     }
   },
@@ -61,6 +61,7 @@
     "aviationretaildirect.com",
     "airplaneshop.com",
     "westcoastdiecast.ca",
+    "aircraftmodelstore.co.uk",
     "scalemodelstore.com"
   ]
 }

@@ -27,7 +27,8 @@ export async function loadCollection() {
   const models: Record<string, CatalogModel> = {};
   for (const item of store.items) {
     const m = item.catalogId ? getModel(item.catalogId, store.customModels) : undefined;
-    if (m) models[m.id] = enrich(m, store);
+    // Keyed by the id the collection stored, which may be an older id that now points at a merged entry.
+    if (m && item.catalogId) models[item.catalogId] = models[m.id] = enrich(m, store);
   }
   const stats = collectionStats(store.items, (id) => models[id], store.settings.currency, fx.toSGD);
   // A fresh number per request drives the rotating featured plane and facts.

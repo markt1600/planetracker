@@ -5,18 +5,19 @@ import type { CatalogMeta, CatalogModel } from "./types";
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-type Indexed = { model: CatalogModel; hay: string; num: string };
+type Indexed = { model: CatalogModel; hay: string; num: string; nums: string[] };
 
 const indexOf = (model: CatalogModel): Indexed => ({
   model,
   num: squash(model.modelNumber),
-  hay: [model.brand, model.line, model.modelNumber, model.title, model.airline, model.aircraft, model.family, model.registration, model.notes]
+  nums: [model.modelNumber, ...(model.aka ?? [])].map(squash),
+  hay: [model.brand, model.line, model.modelNumber, ...(model.aka ?? []), model.title, model.airline, model.aircraft, model.family, model.registration, model.notes]
     .filter(Boolean)
     .join(" ")
     .toLowerCase(),
 });
 
-let cache: { models: CatalogModel[]; index: Indexed[]; byId: Map<string, CatalogModel>; meta: CatalogMeta } | null = null;
+let cache: { models: CatalogModel[]; index: Indexed[]; byId: Map<string, CatalogModel>; meta: CatalogMeta; aliases: Record<string, string> } | null = null;
 
 function load() {
   if (cache) return cache;
@@ -24,13 +25,23 @@ function load() {
   const models = JSON.parse(fs.readFileSync(path.join(dir, "catalog.json"), "utf8")) as CatalogModel[];
   const meta = JSON.parse(fs.readFileSync(path.join(dir, "catalog-meta.json"), "utf8")) as CatalogMeta;
   const index = models.map(indexOf);
-  cache = { models, index, byId: new Map(models.map((m) => [m.id, m])), meta };
+  // Ids of entries that were later merged into another entry (same model listed twice) still resolve.
+  let aliases: Record<string, string> = {};
+  try {
+    aliases = JSON.parse(fs.readFileSync(path.join(dir, "catalog-aliases.json"), "utf8"));
+  } catch {
+    /* no aliases file */
+  }
+  cache = { models, index, byId: new Map(models.map((m) => [m.id, m])), meta, aliases };
   return cache;
 }
 
 export const catalogMeta = () => load().meta;
 /** Looks in the built-in catalogue first, then in models added from the site. */
-export const getModel = (id: string, custom: CatalogModel[] = []) => load().byId.get(id) ?? custom.find((m) => m.id === id);
+export const getModel = (id: string, custom: CatalogModel[] = []) => {
+  const c = load();
+  return c.byId.get(id) ?? c.byId.get(c.aliases[id] ?? "") ?? custom.find((m) => m.id === id);
+};
 export const allModels = () => load().models;
 
 export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; airline?: string; limit?: number; offset?: number; custom?: CatalogModel[] };
@@ -50,9 +61,11 @@ export function searchCatalog({ q = "", brand, scale, family, airline = "", limi
     if (wanted.length && !wanted.every((w) => (m.airline ?? "").toLowerCase().includes(w))) continue;
     let score = 0;
     if (tokens.length) {
-      if (qNum.length >= 3 && entry.num === qNum) score += 100;
-      else if (qNum.length >= 3 && entry.num.startsWith(qNum)) score += 60;
-      else if (qNum.length >= 4 && entry.num.includes(qNum)) score += 40;
+      // Any spelling of the model number counts, and leading zeros are optional (PH4737 finds PH04737).
+      const loose = (n: string) => n.replace(/^([a-z]*)0+(?=\d)/, "$1");
+      if (qNum.length >= 3 && entry.nums.some((n) => n === qNum || loose(n) === loose(qNum))) score += 100;
+      else if (qNum.length >= 3 && entry.nums.some((n) => n.startsWith(qNum))) score += 60;
+      else if (qNum.length >= 4 && entry.nums.some((n) => n.includes(qNum))) score += 40;
       let all = true;
       for (const t of tokens) {
         if (entry.hay.includes(t) || entry.hay.replace(/[^a-z0-9 ]/g, "").includes(t.replace(/[^a-z0-9]/g, ""))) score += 10;
