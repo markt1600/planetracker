@@ -285,6 +285,123 @@ def norm_key(brand, number):
     return brand + "|" + k
 
 
+# ---------------------------------------------------------------- airline names
+# Retailers spell airlines many ways ("LOT", "LOT-Polish Airline", "Viscount 800 LOT Polish"). Each row is:
+# canonical name, pattern that identifies it, subsidiaries to keep apart {pattern: name}, and an optional
+# pattern that means "this is something else" (e.g. "United Arab Emirates" is not Emirates).
+AIRLINES = [
+    ("LOT Polish Airlines", r"\bLOT\b", {}, None),
+    ("KLM Royal Dutch Airlines", r"\bKLM\b", {r"city ?hopper": "KLM Cityhopper", r"\bexel\b": "KLM Exel", r"cargo": "KLM Cargo", r"aeroclub": "KLM Aeroclub"}, r"viasa"),
+    ("All Nippon Airways (ANA)", r"\bANA\b|All Nippon", {r"\bwings\b": "ANA Wings", r"cargo": "ANA Cargo"}, r"ansett|torch"),
+    ("Japan Airlines (JAL)", r"\bJAL\b|Jal No|Japan Air ?[Ll]ines", {r"cargo": "JAL Cargo", r"express": "JAL Express"}, r"torch|system"),
+    ("US Air Force", r"\bUSAF\b|United States Air Force|\bU\.?S\.? Air Force|\bUs Air Force", {}, None),
+    ("Royal Air Force", r"\bRAF\b|Royal Air Force", {}, r"australian|canadian|new zealand|saudi|netherlands|danish|norwegian|thai|malaysian|jordanian|moroccan|oman|brunei|bahrain"),
+    ("Delta Air Lines", r"\bDelta\b", {r"connection": "Delta Connection", r"express": "Delta Express", r"shuttle": "Delta Shuttle"}, None),
+    ("Cathay Pacific", r"Cathay Pacific|Cathay Cargo|^Cathay\b", {r"cargo": "Cathay Pacific Cargo", r"dragon": "Cathay Dragon"}, None),
+    ("Qantas", r"\bQantas\b|\bQANTAS\b", {r"freight": "Qantas Freight", r"link": "QantasLink"}, r"/"),
+    ("Emirates", r"^Emirates\b", {r"sky ?cargo": "Emirates SkyCargo"}, None),
+    ("Lufthansa", r"\bLufthansa\b", {r"cargo": "Lufthansa Cargo", r"regional": "Lufthansa Regional", r"city ?line": "Lufthansa CityLine", r"express": "Lufthansa Express", r"city airlines": "Lufthansa City Airlines", r"italia": "Lufthansa Italia"}, None),
+    ("British Airways", r"British Airways", {r"cargo": "British Airways World Cargo", r"express": "British Airways Express"}, r"/"),
+    ("Singapore Airlines", r"Singapore Airlines|^Singapore$", {r"cargo": "Singapore Airlines Cargo"}, r"/"),
+    ("United Airlines", r"United Air ?[Ll]ines|^United$", {r"express": "United Express"}, None),
+    ("American Airlines", r"American Airlines|^American$", {r"eagle": "American Eagle"}, None),
+    ("Air France", r"Air France", {r"cargo": "Air France Cargo", r"hop": "Air France Hop"}, r"/|-KLM"),
+    ("Air China", r"Air China", {r"cargo": "Air China Cargo"}, None),
+    ("China Eastern Airlines", r"China Eastern", {r"cargo": "China Eastern Cargo", r"yunnan": "China Eastern Yunnan"}, None),
+    ("China Southern Airlines", r"China Southern", {r"cargo": "China Southern Cargo"}, None),
+    ("China Airlines", r"^China Airlines", {r"cargo": "China Airlines Cargo"}, None),
+    ("Korean Air", r"Korean Air", {r"cargo": "Korean Air Cargo"}, None),
+    ("Thai Airways International", r"Thai Airways|^Thai( International)?$", {r"smile": "Thai Smile"}, None),
+    ("Turkish Airlines", r"Turkish Airlines|^Turkish$", {r"cargo": "Turkish Cargo"}, None),
+    ("Qatar Airways", r"Qatar Airways|^Qatar$", {r"cargo": "Qatar Airways Cargo"}, None),
+    ("Etihad Airways", r"\bEtihad\b", {r"cargo": "Etihad Cargo"}, None),
+    ("Air Canada", r"Air Canada", {r"rouge": "Air Canada Rouge", r"express": "Air Canada Express", r"jetz": "Air Canada Jetz", r"cargo": "Air Canada Cargo", r"jazz": "Air Canada Jazz"}, r"trans"),
+    ("Southwest Airlines", r"\bSouthwest\b", {}, r"china"),
+    ("Alaska Airlines", r"^Alaska\b", {r"horizon": "Horizon Air"}, None),
+    ("JetBlue Airways", r"\bjet ?blue\b", {}, None),
+    ("EVA Air", r"\bEVA Air", {r"cargo": "EVA Air Cargo"}, None),
+    ("Malaysia Airlines", r"Malaysia Airlines|Malaysian Airline|^Malaysia$", {}, None),
+    ("Garuda Indonesia", r"\bGaruda\b", {r"citilink": "Citilink"}, None),
+    ("Philippine Airlines", r"Philippine Air ?[Ll]ines|^Philippines?$", {}, None),
+    ("Virgin Atlantic", r"Virgin Atlantic", {}, None),
+    ("Air New Zealand", r"Air New Zealand", {}, None),
+    ("Swiss International Air Lines", r"^Swiss( International( Air ?Lines)?)?$|^SWISS", {}, r"swissair"),
+    ("Iberia", r"^Iberia\b", {r"express": "Iberia Express", r"regional": "Iberia Regional"}, None),
+    ("Finnair", r"\bFinnair\b", {}, None),
+    ("SAS Scandinavian Airlines", r"\bSAS\b|Scandinavian Airlines", {}, None),
+    ("Aeroflot", r"\bAeroflot\b", {r"cargo": "Aeroflot Cargo"}, None),
+    ("Air India", r"Air India", {r"express": "Air India Express"}, None),
+    ("Hainan Airlines", r"Hainan Airlines", {}, None),
+    ("Saudia", r"\bSaudia\b|Saudi Arabian Airlines", {r"cargo": "Saudia Cargo"}, None),
+    ("Ethiopian Airlines", r"^Ethiopian\b", {r"cargo": "Ethiopian Cargo"}, None),
+    ("FedEx", r"\bFedEx\b|\bFedex\b|Federal Express", {}, None),
+    ("UPS", r"\bUPS\b|United Parcel Service", {}, None),
+    ("DHL", r"^DHL\b", {}, r"/"),
+    ("Pan Am", r"\bPan Am\b|Pan American", {}, None),
+    ("TWA", r"\bTWA\b|Trans World Airlines", {}, None),
+    ("Northwest Airlines", r"^Northwest\b|\bNWA\b", {r"airlink": "Northwest Airlink"}, None),
+    ("Continental Airlines", r"^Continental\b", {r"express": "Continental Express", r"micronesia": "Continental Micronesia"}, None),
+    ("easyJet", r"\beasy ?jet\b", {}, None),
+    ("Ryanair", r"\bRyanair\b", {}, None),
+    ("Scoot", r"^Scoot\b", {}, None),
+    ("AirAsia", r"\bAir ?Asia\b", {r"\bx\b": "AirAsia X"}, None),
+    ("Vietnam Airlines", r"Vietnam Airlines", {}, None),
+    ("Asiana Airlines", r"\bAsiana\b", {r"cargo": "Asiana Cargo"}, None),
+    ("Hawaiian Airlines", r"^Hawaiian\b", {}, None),
+    ("Aer Lingus", r"Aer Lingus", {}, None),
+    ("TAP Air Portugal", r"^TAP\b", {r"express": "TAP Express"}, None),
+    ("Icelandair", r"\bIcelandair\b", {}, None),
+    ("Austrian Airlines", r"^Austrian\b", {}, None),
+    ("Xiamen Airlines", r"\bXiamen\b", {}, None),
+    ("Sichuan Airlines", r"^Sichuan\b", {}, None),
+    ("Shenzhen Airlines", r"^Shenzhen\b", {}, None),
+    ("Japan Transocean Air", r"Japan Trans ?[Oo]cean", {}, None),
+    ("Japan Air Self-Defense Force", r"Japan Air Self[- ]Defen[cs]e Force|\bJASDF\b", {}, None),
+    ("Republic of Singapore Air Force", r"Singapore Air Force|\bRSAF\b", {}, None),
+    ("PLA Air Force", r"People.?s Liberation Army Air Force|\bPLAAF\b|PLA Air Force|^China Air Force", {}, None),
+]
+AIRLINES = [(name, re.compile(pat, re.I if pat == pat.lower() else 0), {re.compile(k, re.I): v for k, v in subs.items()},
+             re.compile(skip, re.I) if skip else None) for name, pat, subs, skip in AIRLINES]
+
+
+def canonical_airline(a):
+    for name, pat, subs, skip in AIRLINES:
+        if pat.search(a) and not (skip and skip.search(a)):
+            return next((v for k, v in subs.items() if k.search(a)), name)
+    return None
+
+
+def normalize_airlines(out):
+    """Give every spelling of an airline one name, so filters and stats count them together."""
+    from collections import Counter
+    original = {id(r): r.get("airline") for r in out}
+    for r in out:
+        if r.get("airline"):
+            r["airline"] = canonical_airline(r["airline"]) or r["airline"]
+    # Long tail: spellings that differ only in case, punctuation, brackets or an "Airlines" suffix.
+    def key(a):
+        k = re.sub(r"\([^)]*\)", " ", a.lower())
+        k = re.sub(r"[^a-z0-9 ]", " ", k)
+        k = re.sub(r"\b(air ?lines?|the)\b", " ", k)
+        return re.sub(r"\s+", " ", k).strip()
+    counts = Counter(r["airline"] for r in out if r.get("airline"))
+    best = {}
+    for name, n in counts.items():
+        k = key(name)
+        if k and (k not in best or n > counts[best[k]]):
+            best[k] = name
+    for r in out:
+        if r.get("airline") and key(r["airline"]) in best:
+            r["airline"] = best[key(r["airline"])]
+    # Every spelling seen -> the name it became. The site uses this to tidy airlines typed or saved earlier.
+    aliases = {}
+    for r in out:
+        if r.get("airline"):
+            aliases[r["airline"].lower()] = r["airline"]
+            if original[id(r)]: aliases.setdefault(original[id(r)].strip().lower(), r["airline"])
+    return aliases
+
+
 def true_brand(brand, number):
     """Some retailers file a model under a sister brand; the number format says who really made it."""
     n = re.sub(r"[^A-Z0-9]", "", number.upper())
@@ -650,6 +767,7 @@ def main():
         ids = {e["id"] for e in extras}
         out = [r for r in out if r["id"] not in ids] + extras
         print("extras", len(extras))
+    airline_aliases = normalize_airlines(out)
     out.sort(key=lambda r: (BRANDS.index(r["brand"]), r["modelNumber"]))
 
     os.makedirs(OUT, exist_ok=True)
@@ -657,6 +775,7 @@ def main():
             "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "aircraftmodelstore.co.uk", "scalemodelstore.com"]}
     json.dump(out, open(os.path.join(OUT, "catalog.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump(meta, open(os.path.join(OUT, "catalog-meta.json"), "w"), indent=2)
+    json.dump(dict(sorted(airline_aliases.items())), open(os.path.join(OUT, "airline-aliases.json"), "w"), ensure_ascii=False, indent=0)
     ids = {r["id"] for r in out}
     json.dump({k: v for k, v in sorted(aliases.items()) if k not in ids}, open(os.path.join(OUT, "catalog-aliases.json"), "w"), indent=0)
     from collections import Counter

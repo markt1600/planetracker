@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
 import { del, get, list, put } from "@vercel/blob";
+import { canonicalAirline } from "./catalog";
 import type { StoreDoc } from "./types";
 
 /**
@@ -27,7 +28,21 @@ const empty = (): StoreDoc => ({
   priceHistory: {},
 });
 
-const normalize = (doc: Partial<StoreDoc>): StoreDoc => ({ ...empty(), ...doc, settings: { ...empty().settings, ...doc.settings } });
+/**
+ * Fill in anything missing and reconcile saved data with the catalogue's current airline names, so the
+ * collection, its stats and site-added models use the same spelling as the catalogue. Because every save
+ * starts from this, the corrected names are written back the next time anything is saved.
+ */
+function normalize(raw: Partial<StoreDoc>): StoreDoc {
+  const doc: StoreDoc = { ...empty(), ...raw, settings: { ...empty().settings, ...raw.settings } };
+  return reconcile(doc);
+}
+
+function reconcile(doc: StoreDoc) {
+  for (const item of doc.items) if (item.airline) item.airline = canonicalAirline(item.airline);
+  for (const model of doc.customModels) if (model.airline) model.airline = canonicalAirline(model.airline);
+  return doc;
+}
 
 type Access = "public" | "private";
 /** Blob stores are created as either public or private; this is worked out on first use. */
@@ -114,7 +129,7 @@ async function loadStore(): Promise<StoreDoc> {
 
 export async function writeStore(doc: StoreDoc) {
   doc.updatedAt = new Date().toISOString();
-  const body = JSON.stringify(doc);
+  const body = JSON.stringify(reconcile(doc)); // anything just typed is stored under the agreed airline name
   if (blobEnabled()) {
     // Zero-padded millisecond timestamp keeps pathnames sortable; the random suffix keeps the URL unguessable.
     const name = `${PREFIX}${String(Date.now()).padStart(15, "0")}.json`;

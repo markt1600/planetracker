@@ -36,6 +36,22 @@ function load() {
   return cache;
 }
 
+let airlineNames: Record<string, string> | null = null;
+
+/** The catalogue's one agreed spelling of an airline ("LOT" -> "LOT Polish Airlines"); unknown names pass through. */
+export function canonicalAirline(name: string | undefined) {
+  if (!name) return name;
+  if (!airlineNames) {
+    try {
+      airlineNames = JSON.parse(fs.readFileSync(path.join(process.cwd(), "data", "airline-aliases.json"), "utf8")) as Record<string, string>;
+    } catch {
+      airlineNames = {};
+    }
+  }
+  const tidy = name.trim().replace(/\s+/g, " ");
+  return airlineNames[tidy.toLowerCase()] ?? tidy;
+}
+
 export const catalogMeta = () => load().meta;
 /** Looks in the built-in catalogue first, then in models added from the site. */
 export const getModel = (id: string, custom: CatalogModel[] = []) => {
