@@ -8,7 +8,7 @@ import { CURRENCIES } from "@/lib/format";
 const LINKS = [
   { href: "/", label: "Hangar" },
   { href: "/collection", label: "Collection" },
-  { href: "/museum", label: "Museum" },
+  { href: "/airport", label: "3D view" },
   { href: "/catalog", label: "Catalogue" },
 ];
 
@@ -32,7 +32,7 @@ export default function Nav({ owner, currency }: { owner: string; currency: stri
         </Link>
         <nav className="ml-auto flex items-center gap-1 text-sm">
           {LINKS.map((l) => {
-            const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
+            const active = l.href === "/" ? path === "/" : path.startsWith(l.href) || (l.href === "/airport" && path.startsWith("/museum"));
             return (
               <Link key={l.href} href={l.href} className={`hidden rounded-full px-3 py-1.5 transition sm:block ${active ? "bg-raised text-ink" : "text-mute hover:text-ink"}`}>
                 {l.label}
@@ -64,7 +64,7 @@ export default function Nav({ owner, currency }: { owner: string; currency: stri
       </div>
       <nav className="flex border-t border-line/50 text-sm sm:hidden">
         {LINKS.map((l) => {
-          const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
+          const active = l.href === "/" ? path === "/" : path.startsWith(l.href) || (l.href === "/airport" && path.startsWith("/museum"));
           return (
             <Link key={l.href} href={l.href} className={`flex-1 py-2 text-center ${active ? "text-amber" : "text-mute"}`}>
               {l.label}

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import Museum, { type Exhibit } from "@/components/Museum";
+import Museum from "@/components/Museum";
+import type { Exhibit } from "@/components/plane3d";
+import ViewSwitch from "@/components/ViewSwitch";
 import { estimatePrice, money } from "@/lib/format";
 import { loadCollection } from "@/lib/view";
 
@@ -35,7 +37,7 @@ export default async function MuseumPage() {
           <p className="label">Gallery</p>
           <h1 className="mt-1 font-display text-4xl tracking-tight">The museum hall</h1>
         </div>
-        <p className="text-sm text-mute">{exhibits.length} {exhibits.length === 1 ? "exhibit" : "exhibits"} on display</p>
+        <ViewSwitch current="museum" />
       </header>
       <Museum exhibits={exhibits} />
     </div>

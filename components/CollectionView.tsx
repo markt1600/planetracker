@@ -82,6 +82,7 @@ function Detail({ item, model, photos, history, currency, toSGD, onClose }: { it
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-night/85 p-0 backdrop-blur-sm sm:p-6" onClick={onClose} role="dialog" aria-modal="true" aria-label={item.title}>
+      <button onClick={onClose} className="fixed right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full border border-line bg-night/90 text-lg text-ink md:hidden" aria-label="Close">✕</button>
       <div className="panel rise mx-auto max-w-4xl !rounded-none !bg-panel sm:!rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="grid md:grid-cols-2">
           <div>
@@ -128,7 +129,7 @@ function Detail({ item, model, photos, history, currency, toSGD, onClose }: { it
           <div className="flex flex-col border-t border-line p-5 sm:p-6 md:border-l md:border-t-0">
             <div className="flex items-start justify-between gap-3">
               <p className="label">{item.brand} · {item.modelNumber}</p>
-              <button onClick={onClose} className="-mr-1 -mt-1 rounded-full p-1.5 text-mute hover:bg-raised hover:text-ink" aria-label="Close">✕</button>
+              <button onClick={onClose} className="-mr-1 -mt-1 hidden rounded-full p-1.5 text-mute hover:bg-raised hover:text-ink md:block" aria-label="Close">✕</button>
             </div>
             <h2 className="mt-1.5 font-display text-2xl leading-tight">{item.title}</h2>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -169,10 +170,10 @@ function Detail({ item, model, photos, history, currency, toSGD, onClose }: { it
             )}
 
             <form className="mt-5 space-y-3 border-t border-line pt-5" onSubmit={(e) => { e.preventDefault(); const n = price.trim() === "" ? null : Number(price); if (n != null && Number.isNaN(n)) return setError("The price should be a number"); run("save", () => api(`/api/collection/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...info, pricePaid: n, currency: cur, acquiredAt: date || null, notes: notes || null }) })); }}>
-              <div className="grid grid-cols-[1fr_6rem_9.5rem] gap-2">
+              <div className="grid grid-cols-[1fr_6rem] gap-2 sm:grid-cols-[1fr_6rem_9.5rem]">
                 <label><span className="label">Price paid</span><input className="field mt-1" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" /></label>
                 <label><span className="label">&nbsp;</span><select className="field mt-1" value={cur} onChange={(e) => setCur(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></label>
-                <label><span className="label">Date</span><input className="field mt-1" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+                <label className="col-span-2 sm:col-span-1"><span className="label">Date</span><input className="field mt-1" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
               </div>
               <label className="block"><span className="label">My notes (private)</span><textarea className="field mt-1 min-h-20" maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Missing box, damaged wheel, where it came from…" /></label>
               <details className="rounded-xl border border-line p-3">
@@ -260,25 +261,58 @@ export default function CollectionView({ items, models, photos, history, currenc
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <input className="field !w-auto min-w-0 flex-1 basis-56" placeholder="Search your planes…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search your planes" />
-        <select className="field !w-auto" value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="Manufacturer">
+      <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
+        <input className="field col-span-2 min-w-0 sm:!w-auto sm:flex-1 sm:basis-56" placeholder="Search your planes…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search your planes" />
+        <select className="field sm:!w-auto" value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="Manufacturer">
           <option value="">All manufacturers</option>
           {brands.map((b) => <option key={b}>{b}</option>)}
         </select>
-        <select className="field !w-auto" value={sort} onChange={(e) => setSort(e.target.value as keyof typeof SORTS)} aria-label="Sort">
+        <select className="field sm:!w-auto" value={sort} onChange={(e) => setSort(e.target.value as keyof typeof SORTS)} aria-label="Sort">
           {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <div className="flex rounded-full border border-line p-0.5 text-sm" role="group" aria-label="View">
+        <div className="flex justify-self-start rounded-full border border-line p-0.5 text-sm" role="group" aria-label="View">
           {(["grid", "list"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={`rounded-full px-3 py-1.5 capitalize ${view === v ? "bg-raised text-ink" : "text-mute"}`}>{v}</button>
           ))}
         </div>
-        <Link href="/museum" className="btn btn-ghost !py-2">Walk the museum →</Link>
+        <Link href="/airport" className="btn btn-ghost justify-self-end !py-2">3D view →</Link>
       </div>
 
       {view === "list" && (
-        <div className="panel mt-4 overflow-x-auto">
+        <ul className="panel mt-4 divide-y divide-line/60 sm:hidden">
+          {shown.map((i) => {
+            const m = i.catalogId ? models[i.catalogId] : undefined;
+            const own = photos[i.catalogId ?? i.id] ?? [];
+            const v = valueOf(i);
+            return (
+              <li key={i.id} className="flex items-center gap-3 p-3">
+                <button onClick={() => setOpen(i.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <PlaneImage sources={[own[own.length - 1], m?.image ?? i.image, m?.remoteImage]} alt="" fit={own.length ? "cover" : "contain"} className="h-12 w-16 shrink-0 rounded-md" />
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 text-sm leading-snug">{i.title}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[0.7rem] text-mute">{i.scale} · {i.modelNumber}{v != null ? ` · ${money(Math.round(v), currency)}` : ""}</span>
+                  </span>
+                </button>
+                <span className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
+                  {removing === i.id ? (
+                    <>
+                      <button className="text-bad" onClick={async () => { try { await api(`/api/collection/${i.id}`, { method: "DELETE" }); router.refresh(); } catch (e) { setChecking((e as Error).message); } setRemoving(null); }}>Confirm</button>
+                      <button className="text-mute" onClick={() => setRemoving(null)}>Keep</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="text-sky" onClick={() => setOpen(i.id)}>Edit</button>
+                      <button className="text-mute" onClick={() => setRemoving(i.id)}>Delete</button>
+                    </>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {view === "list" && (
+        <div className="panel mt-4 hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[44rem] text-left text-sm">
             <thead>
               <tr className="border-b border-line">

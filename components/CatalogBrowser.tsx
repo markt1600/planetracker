@@ -47,7 +47,7 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
   }, [key, more]);
 
   const select = (label: string, value: string, set: (v: string) => void, options: Facet[]) => (
-    <select className="field !w-auto max-w-[11rem]" value={value} onChange={(e) => set(e.target.value)} aria-label={label}>
+    <select className="field sm:!w-auto sm:max-w-[11rem]" value={value} onChange={(e) => set(e.target.value)} aria-label={label}>
       <option value="">{label}</option>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -59,8 +59,8 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <input className="field !w-auto min-w-0 flex-1 basis-64" placeholder="Search airline, type, model number, registration…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the catalogue" />
+      <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
+        <input className="field col-span-2 min-w-0 sm:!w-auto sm:flex-1 sm:basis-64" placeholder="Search airline, type, model number, registration…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the catalogue" />
         {select("All manufacturers", brand, setBrand, brands)}
         {select("All scales", scale, setScale, scales)}
         {select("All aircraft", family, setFamily, families)}
@@ -99,6 +99,7 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
 
       {open && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-night/85 backdrop-blur-sm sm:p-6" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label={open.title}>
+          <button onClick={() => setOpen(null)} className="fixed right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full border border-line bg-night/90 text-lg text-ink md:hidden" aria-label="Close">✕</button>
           <div className="panel rise mx-auto max-w-3xl !rounded-none !bg-panel sm:!rounded-3xl" onClick={(e) => e.stopPropagation()}>
             <div className="grid md:grid-cols-2">
               <div>
