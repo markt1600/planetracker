@@ -21,6 +21,7 @@ const empty = (): StoreDoc => ({
   settings: { owner: process.env.OWNER_NAME ?? "Ethan", currency: process.env.DEFAULT_CURRENCY ?? "SGD" },
   items: [],
   modelPhotos: {},
+  customModels: [],
   priceHistory: {},
 });
 

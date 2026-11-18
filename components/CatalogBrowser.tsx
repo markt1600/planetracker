@@ -97,6 +97,14 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
         </div>
       )}
 
+      <p className="mt-10 border-t border-line pt-5 text-center text-sm text-mute">
+        Know a model that isn&rsquo;t listed?{" "}
+        <Link href="/catalog/new" className="text-sky underline-offset-4 hover:underline">
+          Add it to the catalogue
+        </Link>{" "}
+        — it won&rsquo;t be added to the collection.
+      </p>
+
       {open && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-night/85 backdrop-blur-sm sm:p-6" onClick={() => setOpen(null)} role="dialog" aria-modal="true" aria-label={open.title}>
           <button onClick={() => setOpen(null)} className="fixed right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full border border-line bg-night/90 text-lg text-ink md:hidden" aria-label="Close">✕</button>

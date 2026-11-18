@@ -2,6 +2,23 @@ import { z } from "zod";
 
 const text = (max: number) => z.string().trim().max(max);
 
+/** A model added to the shared catalogue from the site. */
+export const ModelInput = z.object({
+  brand: text(60).min(1, "Choose a manufacturer"),
+  modelNumber: text(60).min(1, "Add the model number"),
+  scale: text(12).regex(/^1:\d{1,4}$/, "Scale should look like 1:400"),
+  title: text(200).min(1, "Add a description"),
+  airline: text(100).optional(),
+  aircraft: text(60).optional(),
+  family: text(60).optional(),
+  registration: text(20).optional(),
+  notes: text(200).optional(),
+  description: text(1200).optional(),
+  price: z.number().min(0).max(1_000_000).optional(),
+  currency: text(3).optional(),
+  priceSource: text(60).optional(),
+});
+
 export const ItemInput = z.object({
   catalogId: text(120).optional(),
   brand: text(60).min(1, "Choose a manufacturer"),

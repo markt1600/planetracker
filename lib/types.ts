@@ -58,6 +58,8 @@ export type StoreDoc = {
   items: CollectionItem[];
   /** catalogId (or collection item id for custom planes) -> photo URLs uploaded by the collector. */
   modelPhotos: Record<string, string[]>;
+  /** Models added to the catalogue from the site (not part of the built-in catalogue file). */
+  customModels: CatalogModel[];
   /** catalogId -> price history recorded by the price tracker. */
   priceHistory: Record<string, PricePoint[]>;
   pricesCheckedAt?: string;

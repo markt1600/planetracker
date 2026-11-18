@@ -3,40 +3,44 @@ import fs from "node:fs";
 import path from "node:path";
 import type { CatalogMeta, CatalogModel } from "./types";
 
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 type Indexed = { model: CatalogModel; hay: string; num: string };
 
-let cache: { models: CatalogModel[]; index: Indexed[]; byId: Map<string, CatalogModel>; meta: CatalogMeta } | null = null;
+const indexOf = (model: CatalogModel): Indexed => ({
+  model,
+  num: squash(model.modelNumber),
+  hay: [model.brand, model.line, model.modelNumber, model.title, model.airline, model.aircraft, model.family, model.registration, model.notes]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase(),
+});
 
-const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+let cache: { models: CatalogModel[]; index: Indexed[]; byId: Map<string, CatalogModel>; meta: CatalogMeta } | null = null;
 
 function load() {
   if (cache) return cache;
   const dir = path.join(process.cwd(), "data");
   const models = JSON.parse(fs.readFileSync(path.join(dir, "catalog.json"), "utf8")) as CatalogModel[];
   const meta = JSON.parse(fs.readFileSync(path.join(dir, "catalog-meta.json"), "utf8")) as CatalogMeta;
-  const index = models.map((model) => ({
-    model,
-    num: squash(model.modelNumber),
-    hay: [model.brand, model.line, model.modelNumber, model.title, model.airline, model.aircraft, model.family, model.registration, model.notes]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase(),
-  }));
+  const index = models.map(indexOf);
   cache = { models, index, byId: new Map(models.map((m) => [m.id, m])), meta };
   return cache;
 }
 
 export const catalogMeta = () => load().meta;
-export const getModel = (id: string) => load().byId.get(id);
+/** Looks in the built-in catalogue first, then in models added from the site. */
+export const getModel = (id: string, custom: CatalogModel[] = []) => load().byId.get(id) ?? custom.find((m) => m.id === id);
 export const allModels = () => load().models;
 
-export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; limit?: number; offset?: number };
+export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; limit?: number; offset?: number; custom?: CatalogModel[] };
 
-export function searchCatalog({ q = "", brand, scale, family, limit = 24, offset = 0 }: SearchOptions) {
+export function searchCatalog({ q = "", brand, scale, family, limit = 24, offset = 0, custom = [] }: SearchOptions) {
   const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
   const qNum = squash(q);
   const scored: { model: CatalogModel; score: number }[] = [];
-  for (const entry of load().index) {
+  // Site-added models come first so a newly added plane is easy to find.
+  for (const entry of [...custom.map(indexOf), ...load().index]) {
     const m = entry.model;
     if (brand && m.brand !== brand) continue;
     if (scale && m.scale !== scale) continue;

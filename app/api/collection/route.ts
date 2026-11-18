@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const parsed = ItemInput.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid plane" }, { status: 400 });
   const input = blankToUndefined(parsed.data);
-  if (input.catalogId && !getModel(input.catalogId)) delete input.catalogId;
+  if (input.catalogId && !getModel(input.catalogId, (await readStore()).customModels)) delete input.catalogId;
   const item: CollectionItem = { ...input, id: crypto.randomUUID(), addedAt: new Date().toISOString() };
   await updateStore((doc) => {
     doc.items.push(item);

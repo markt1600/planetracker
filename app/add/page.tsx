@@ -12,7 +12,7 @@ export default async function AddPage({ searchParams }: PageProps<"/add">) {
   const { model } = await searchParams;
   const [store, fx] = await Promise.all([readStore(), getRates()]);
   const meta = catalogMeta();
-  const found = typeof model === "string" ? getModel(model) : undefined;
+  const found = typeof model === "string" ? getModel(model, store.customModels) : undefined;
   return (
     <div className="space-y-6">
       <header className="rise text-center">

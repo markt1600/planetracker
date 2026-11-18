@@ -16,7 +16,9 @@ export function enrich(model: CatalogModel, store: StoreDoc): CatalogModel {
     const old = (prices ?? []).find((p) => p.source === PREFERRED_SOURCE);
     prices = [{ ...old, source: PREFERRED_SOURCE, amount: last.amount, currency: last.currency, inStock: last.inStock }, ...rest];
   }
-  return { ...model, prices, userPhotos: store.modelPhotos[model.id] ?? [] };
+  const userPhotos = store.modelPhotos[model.id] ?? [];
+  // Site-added models have no stock photo, so the collector's first photo stands in for it.
+  return { ...model, image: model.image ?? userPhotos[0], prices, userPhotos };
 }
 
 export async function loadCollection() {
@@ -24,7 +26,7 @@ export async function loadCollection() {
   const meta = catalogMeta();
   const models: Record<string, CatalogModel> = {};
   for (const item of store.items) {
-    const m = item.catalogId ? getModel(item.catalogId) : undefined;
+    const m = item.catalogId ? getModel(item.catalogId, store.customModels) : undefined;
     if (m) models[m.id] = enrich(m, store);
   }
   const stats = collectionStats(store.items, (id) => models[id], store.settings.currency, fx.toSGD);
