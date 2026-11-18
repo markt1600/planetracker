@@ -4,6 +4,7 @@ import PlaneImage from "@/components/PlaneImage";
 import Stats from "@/components/Stats";
 import { allModels } from "@/lib/catalog";
 import { FACTS } from "@/lib/facts";
+import { WISHLIST_MAX } from "@/lib/format";
 import { loadCollection } from "@/lib/view";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,15 @@ export default async function Home() {
     <div className="space-y-8">
       <Featured plane={plane} eyebrow="Featured from the hangar" seed={seed} />
       <Stats stats={stats} currency={store.settings.currency} />
+      {store.wishlist.length > 0 && (
+        <Link href="/wishlist" className="panel flex items-center justify-between gap-3 px-5 py-4 transition hover:border-sky/60">
+          <span>
+            <span className="label">Wishlist</span>
+            <span className="mt-1 block text-sm">{store.wishlist.length} of {WISHLIST_MAX} spots filled — see what&rsquo;s next for the hangar</span>
+          </span>
+          <span className="text-sky">→</span>
+        </Link>
+      )}
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-2xl">Latest arrivals</h2>

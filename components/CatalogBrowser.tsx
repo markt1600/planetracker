@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
-import { estimatePrice, money, shown } from "@/lib/format";
+import { estimatePrice, money, shown, WISHLIST_MAX } from "@/lib/format";
 import type { CatalogModel } from "@/lib/types";
 import PlaneImage from "./PlaneImage";
 
 type Facet = { value: string; n: number };
-type Result = CatalogModel & { owned?: boolean };
+type Result = CatalogModel & { owned?: boolean; wished?: boolean };
+type Wish = { catalogId: string; model: CatalogModel };
 const PAGE = 36;
 
 export default function CatalogBrowser({ brands, scales, families, currency, toSGD }: { brands: Facet[]; scales: Facet[]; families: Facet[]; currency: string; toSGD: Record<string, number> }) {
@@ -20,6 +21,40 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
   const [more, setMore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Result | null>(null);
+  const [wishes, setWishes] = useState<Wish[] | null>(null);
+  const [wishNote, setWishNote] = useState<{ full?: boolean; text?: string }>({});
+  const [wishBusy, setWishBusy] = useState(false);
+
+  useEffect(() => {
+    api<{ wishlist: Wish[] }>("/api/wishlist").then((d) => setWishes(d.wishlist)).catch(() => setWishes([]));
+  }, []);
+
+  const isWished = (id: string) => (wishes ? wishes.some((w) => w.catalogId === id) : false);
+  const wish = async (method: "POST" | "DELETE", catalogId: string) => {
+    setWishBusy(true);
+    try {
+      const res = await fetch("/api/wishlist", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ catalogId }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 && data.needsPasscode) {
+        // Reuse the shared helper so the passcode prompt appears, then try again once.
+        const again = await api<{ wishlist: Wish[] }>("/api/wishlist", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ catalogId }) });
+        setWishes(again.wishlist);
+        setWishNote({});
+      } else if (res.status === 409) {
+        setWishes(data.wishlist ?? wishes);
+        setWishNote({ full: true });
+      } else if (!res.ok) {
+        setWishNote({ text: data.error ?? "That didn't work. Try again." });
+      } else {
+        setWishes(data.wishlist);
+        setWishNote(method === "POST" ? { text: "Added to your wishlist." } : wishNote.full ? { text: "Removed. There's room now — add this one." } : {});
+      }
+    } catch (e) {
+      setWishNote({ text: (e as Error).message });
+    } finally {
+      setWishBusy(false);
+    }
+  };
 
   const key = JSON.stringify([q, brand, scale, family]);
 
@@ -71,10 +106,11 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
         {data.results.map((m) => {
           const est = estimatePrice(m.prices, currency, toSGD);
           return (
-            <button key={m.id} onClick={() => setOpen(m)} className="panel overflow-hidden text-left transition hover:-translate-y-0.5 hover:border-sky/60">
+            <button key={m.id} onClick={() => { setOpen(m); setWishNote({}); }} className="panel overflow-hidden text-left transition hover:-translate-y-0.5 hover:border-sky/60">
               <div className="relative">
                 <PlaneImage sources={[m.image, m.remoteImage]} alt={m.title} className="aspect-[4/3]" />
                 {m.owned && <span className="chip chip-amber absolute left-2 top-2 !bg-night/85">In hangar</span>}
+                {(wishes ? isWished(m.id) : m.wished) && <span className="chip absolute right-2 top-2 !border-sky/60 !bg-night/85 !text-sky">♥ Wishlist</span>}
               </div>
               <div className="p-3">
                 <p className="label truncate">{m.brand} · {m.modelNumber}</p>
@@ -162,10 +198,32 @@ export default function CatalogBrowser({ brands, scales, families, currency, toS
                     </ul>
                   </div>
                 )}
-                <div className="mt-auto pt-6">
+                <div className="mt-auto space-y-2 pt-6">
+                  {wishNote.full && wishes && (
+                    <div className="rounded-xl border border-amber/40 bg-amber/10 p-3">
+                      <p className="text-sm text-amber">Your wishlist is full ({WISHLIST_MAX} planes). Remove one to make room for this one.</p>
+                      <ul className="mt-2 space-y-1.5">
+                        {wishes.map((w) => (
+                          <li key={w.catalogId} className="flex items-center gap-2 text-sm">
+                            <PlaneImage sources={[w.model.image, w.model.remoteImage]} alt="" className="h-8 w-11 shrink-0 rounded" />
+                            <span className="min-w-0 flex-1 truncate">{w.model.title}</span>
+                            <button className="shrink-0 text-xs text-bad hover:underline" disabled={wishBusy} onClick={() => wish("DELETE", w.catalogId)}>Remove</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {wishNote.text && <p className="text-sm text-mute" role="status">{wishNote.text}</p>}
                   <Link href={`/add?model=${open.id}`} className="btn btn-primary w-full">
                     {open.owned ? "+ Add another copy" : "+ Add to my collection"}
                   </Link>
+                  {isWished(open.id) ? (
+                    <button className="btn btn-ghost w-full" disabled={wishBusy} onClick={() => wish("DELETE", open.id)}>♥ On your wishlist — remove</button>
+                  ) : (
+                    <button className="btn btn-ghost w-full" disabled={wishBusy || !wishes} onClick={() => wish("POST", open.id)}>
+                      ♡ Add to wishlist{wishes ? ` (${wishes.length}/${WISHLIST_MAX})` : ""}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

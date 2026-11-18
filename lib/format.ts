@@ -19,6 +19,9 @@ export function convert(amount: number, from: string, to: string, toSGD: Record<
   return (amount * a) / b;
 }
 
+/** The wishlist is capped so it stays a real shortlist: to add another, one has to come off. */
+export const WISHLIST_MAX = 3;
+
 export const PREFERRED_SOURCE = "Airplane Model SG";
 
 /** Best price guess in the target currency. Airplane Model SG wins when it lists the model. */

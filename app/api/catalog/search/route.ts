@@ -16,8 +16,9 @@ export async function GET(request: Request) {
     offset,
   });
   const owned = new Set(store?.items.map((i) => i.catalogId));
+  const wished = new Set(store?.wishlist.map((w) => w.catalogId));
   return Response.json({
     total,
-    results: results.map((m) => { const userPhotos = store?.modelPhotos[m.id] ?? []; return { ...m, image: m.image ?? userPhotos[0], userPhotos, owned: owned.has(m.id) }; }),
+    results: results.map((m) => { const userPhotos = store?.modelPhotos[m.id] ?? []; return { ...m, image: m.image ?? userPhotos[0], userPhotos, owned: owned.has(m.id), wished: wished.has(m.id) }; }),
   });
 }

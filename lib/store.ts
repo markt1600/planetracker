@@ -23,6 +23,7 @@ const empty = (): StoreDoc => ({
   items: [],
   modelPhotos: {},
   customModels: [],
+  wishlist: [],
   priceHistory: {},
 });
 

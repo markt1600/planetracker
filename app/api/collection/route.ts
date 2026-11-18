@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   const item: CollectionItem = { ...input, id: crypto.randomUUID(), addedAt: new Date().toISOString() };
   await updateStore((doc) => {
     doc.items.push(item);
+    // A wished-for plane that has now arrived comes off the wishlist.
+    if (item.catalogId) doc.wishlist = doc.wishlist.filter((w) => w.catalogId !== item.catalogId);
   });
   return Response.json(item, { status: 201 });
 }

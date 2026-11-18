@@ -61,6 +61,8 @@ export type StoreDoc = {
   modelPhotos: Record<string, string[]>;
   /** Models added to the catalogue from the site (not part of the built-in catalogue file). */
   customModels: CatalogModel[];
+  /** Planes Ethan wants next (catalogue ids). Kept deliberately short: see WISHLIST_MAX. */
+  wishlist: { catalogId: string; addedAt: string }[];
   /** catalogId -> price history recorded by the price tracker. */
   priceHistory: Record<string, PricePoint[]>;
   pricesCheckedAt?: string;
