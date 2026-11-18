@@ -12,9 +12,17 @@ const display = Fraunces({ variable: "--font-display", subsets: ["latin"], axes:
 
 const owner = process.env.OWNER_NAME ?? "Ethan";
 
+// Absolute address for share previews (WhatsApp, iMessage, etc.). Vercel provides the production domain.
+const site = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+const description = "A die-cast model aircraft collection: every plane catalogued, valued and parked at a 3D Changi airport.";
+
 export const metadata: Metadata = {
+  metadataBase: site ? new URL(`https://${site}`) : undefined,
   title: { default: `${owner}'s Hangar`, template: `%s · ${owner}'s Hangar` },
-  description: "A die-cast model aircraft collection tracker.",
+  description,
+  // The preview picture itself is app/opengraph-image.jpg (1200×630), picked up automatically.
+  openGraph: { type: "website", siteName: `${owner}'s Hangar`, title: `${owner}'s Hangar`, description },
+  twitter: { card: "summary_large_image", title: `${owner}'s Hangar`, description },
 };
 
 export const viewport: Viewport = { themeColor: "#070b14" };
