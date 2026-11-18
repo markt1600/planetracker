@@ -19,6 +19,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEST = os.path.join(ROOT, "public", "catalog")
 UA = "Mozilla/5.0 (compatible; catalog-builder/1.0)"
 MAX_W, QUALITY = 720, 72
+# Smaller shops are fetched two at a time with a pause; CDN-hosted photos go faster.
+SLOW_HOSTS = ("airplanemodelsg.com", "scalemodelstore.com")
 
 
 def grab(job):
@@ -26,7 +28,7 @@ def grab(job):
     out = os.path.join(DEST, name + ".webp")
     if not url or os.path.exists(out):
         return "skip"
-    slow = "airplanemodelsg.com" in url
+    slow = any(h in url for h in SLOW_HOSTS)
     for attempt in range(3):
         try:
             req = urllib.request.Request(urllib.parse.quote(url, safe=":/?&=%"), headers={"User-Agent": UA})
@@ -55,7 +57,7 @@ def main():
     for r in recs:
         jobs.append((r["id"], r.get("remoteImage")))
         jobs += [(f"{r['id']}-{n + 2}", u) for n, u in enumerate(r.get("remoteGallery") or [])]
-    slow = [j for j in jobs if "airplanemodelsg.com" in (j[1] or "")]
+    slow = [j for j in jobs if any(h in (j[1] or "") for h in SLOW_HOSTS)]
     fast = [j for j in jobs if j not in slow]
     counts = {}
     for group, workers in ((fast, 6), (slow, 2)):

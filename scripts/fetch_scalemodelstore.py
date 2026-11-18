@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import time
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -21,7 +22,8 @@ lock = threading.Lock()
 
 
 def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    # Airline names with accents appear in the addresses, so they must be percent-encoded.
+    req = urllib.request.Request(urllib.parse.quote(url, safe=":/?&=%"), headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=60) as r:
         return r.read().decode("utf-8", "replace")
 
