@@ -22,7 +22,13 @@ type Props = {
   pricesCheckedAt?: string;
 };
 
-const SORTS = { newest: "Newest first", name: "Name A–Z", airline: "Airline A–Z", type: "Aircraft type", scale: "Scale", value: "Highest value", paid: "Highest price paid", brand: "Manufacturer", number: "Model number" } as const;
+const SORTS = { newest: "Date added", name: "Name", airline: "Airline", type: "Aircraft type", scale: "Scale", value: "Value", paid: "Price paid", brand: "Manufacturer", number: "Model number" } as const;
+type SortKey = keyof typeof SORTS;
+type Dir = "asc" | "desc";
+/** The direction each sort starts in: newest and most valuable first, everything else A–Z. */
+const START_DIR: Record<SortKey, Dir> = { newest: "desc", value: "desc", paid: "desc", name: "asc", airline: "asc", type: "asc", scale: "asc", brand: "asc", number: "asc" };
+const NUMERIC: SortKey[] = ["newest", "value", "paid"];
+export const dirLabel = (numeric: boolean, dir: Dir, date = false) => (date ? (dir === "desc" ? "Newest first" : "Oldest first") : numeric ? (dir === "desc" ? "High to low" : "Low to high") : dir === "asc" ? "A to Z" : "Z to A");
 
 function Sparkline({ points }: { points: PricePoint[] }) {
   if (points.length < 2) return null;
@@ -215,7 +221,16 @@ export default function CollectionView({ items, models, photos, history, currenc
   const router = useRouter();
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("");
-  const [sort, setSort] = useState<keyof typeof SORTS>("newest");
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [dir, setDir] = useState<Dir>("desc");
+  /** Choosing a new sort starts in its natural direction; choosing the same one again flips it. */
+  const chooseSort = (k: SortKey) => {
+    if (k === sort) setDir(dir === "asc" ? "desc" : "asc");
+    else {
+      setSort(k);
+      setDir(START_DIR[k]);
+    }
+  };
   const [open, setOpen] = useState<string | null>(openId ?? null);
   const [checking, setChecking] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -230,23 +245,31 @@ export default function CollectionView({ items, models, photos, history, currenc
       const hay = [i.brand, i.modelNumber, i.title, i.airline, i.aircraft, i.registration, i.notes].join(" ").toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
-    type Cmp = (a: CollectionItem, b: CollectionItem) => number;
-    const text = (get: (i: CollectionItem) => string | undefined): Cmp => (a, b) => (get(a) ?? "~").localeCompare(get(b) ?? "~", "en", { numeric: true }) || a.title.localeCompare(b.title);
-    const paid = (i: CollectionItem) => (i.pricePaid != null ? convert(i.pricePaid, i.currency, currency, toSGD) ?? 0 : -1);
-    const by: Record<keyof typeof SORTS, Cmp> = {
-      newest: (a, b) => b.addedAt.localeCompare(a.addedAt),
-      name: text((i) => i.title),
-      airline: text((i) => i.airline),
-      type: text((i) => i.aircraft),
-      scale: text((i) => i.scale),
-      value: (a, b) => (valueOf(b) ?? -1) - (valueOf(a) ?? -1),
-      paid: (a, b) => paid(b) - paid(a),
-      brand: text((i) => i.brand),
-      number: text((i) => i.modelNumber),
+    const scaleOf = (i: CollectionItem) => Number(/1:(\d+)/.exec(i.scale)?.[1] ?? NaN);
+    const read: Record<SortKey, (i: CollectionItem) => string | number | null | undefined> = {
+      newest: (i) => i.addedAt,
+      name: (i) => i.title.replace(/^(\([^)]*\)|[^A-Za-z0-9])+\s*/, ""), // ignore a leading "(Ultimate Collection)" or quote mark
+      airline: (i) => i.airline,
+      type: (i) => i.aircraft,
+      scale: (i) => (Number.isNaN(scaleOf(i)) ? null : scaleOf(i)),
+      value: (i) => valueOf(i),
+      paid: (i) => (i.pricePaid != null ? convert(i.pricePaid, i.currency, currency, toSGD) : null),
+      brand: (i) => i.brand,
+      number: (i) => i.modelNumber,
     };
-    return list.sort(by[sort]);
+    const get = read[sort];
+    const sign = dir === "asc" ? 1 : -1;
+    return list.sort((a, b) => {
+      const x = get(a);
+      const y = get(b);
+      // Planes missing the value (no price, no airline) always go last, whichever way the list runs.
+      if (x == null || x === "") return y == null || y === "" ? a.title.localeCompare(b.title) : 1;
+      if (y == null || y === "") return -1;
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true });
+      return c * sign || a.title.localeCompare(b.title);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, q, brand, sort, models, currency]);
+  }, [items, q, brand, sort, dir, models, currency]);
 
   const openItem = items.find((i) => i.id === open);
   const close = () => {
@@ -277,9 +300,14 @@ export default function CollectionView({ items, models, photos, history, currenc
           <option value="">All manufacturers</option>
           {brands.map((b) => <option key={b}>{b}</option>)}
         </select>
-        <select className="field sm:!w-auto" value={sort} onChange={(e) => setSort(e.target.value as keyof typeof SORTS)} aria-label="Sort">
-          {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <div className="flex gap-2">
+          <select className="field min-w-0 sm:!w-auto" value={sort} onChange={(e) => { const k = e.target.value as SortKey; setSort(k); setDir(START_DIR[k]); }} aria-label="Sort by">
+            {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>Sort: {v}</option>)}
+          </select>
+          <button type="button" className="btn btn-ghost shrink-0 !rounded-xl !px-3" onClick={() => setDir(dir === "asc" ? "desc" : "asc")} title={`${dirLabel(NUMERIC.includes(sort), dir, sort === "newest")} — tap to reverse`} aria-label={`Order: ${dirLabel(NUMERIC.includes(sort), dir, sort === "newest")}. Tap to reverse.`}>
+            <span aria-hidden>{dir === "asc" ? "↑" : "↓"}</span>
+          </button>
+        </div>
         <div className="flex justify-self-start rounded-full border border-line p-0.5 text-sm" role="group" aria-label="View">
           {(["grid", "list"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={`rounded-full px-3 py-1.5 capitalize ${view === v ? "bg-raised text-ink" : "text-mute"}`}>{v}</button>
@@ -328,7 +356,7 @@ export default function CollectionView({ items, models, photos, history, currenc
               <tr className="border-b border-line">
                 {([["name", "Plane"], ["airline", "Airline"], ["type", "Type"], ["scale", "Scale"], ["paid", "Paid"], ["value", "Value"]] as const).map(([k, label]) => (
                   <th key={k} className="px-3 py-2.5 font-normal">
-                    <button onClick={() => setSort(k)} className={`label hover:text-ink ${sort === k ? "!text-amber" : ""}`}>{label}{sort === k ? " ↓" : ""}</button>
+                    <button onClick={() => chooseSort(k)} title="Sort by this column; click again to reverse" className={`label hover:text-ink ${sort === k ? "!text-amber" : ""}`}>{label}{sort === k ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
                   </th>
                 ))}
                 <th className="px-3 py-2.5" />

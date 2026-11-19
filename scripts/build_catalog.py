@@ -165,7 +165,9 @@ ACCESSORY_RE = re.compile(
     r"\b(stands?\b(?! included)|display case|airport (?:passenger )?bus|buses|GSE|ground (?:service|support)|air ?bridge|jet ?bridge|hangar|terminal|"
     r"key ?(?:chain|ring|tag)|tugs?|pushback|tractor|cargo (?:cart|container|set)|stair|foil|mat\b|runway|playset|pullback|"
     r"aircraft parking|fire station|tow ?bar|landing gear set|gears? set|engine set|catalog(?:ue)?|book|magazine|sticker|decal|puzzle|plush|"
-    r"t-shirt|mug\b|luggage|airport (?:set|accessor)|accessor|snap[- ]?fit|blind box)", re.I)
+    r"t-shirt|mug\b|luggage|airport (?:set|accessor)|accessor|snap[- ]?fit|blind box|"
+    r"weapons? pack|landing gear|jet blast|scenix|flood ?lights?|container loader|boarding station|fire engine|passenger gate|"
+    r"airport (?:building|tower|fire)|construction kit|\bvehicles\b|\bvan set\b|marshall?er|apa system|\d\s*pcs?\b|\bpieces\b)", re.I)
 QUOTE_RE = re.compile(r"[“\"‘']{1,2}\s?([^”\"’']{3,90}?)\s?[”\"’″']{1,2}")
 
 
@@ -294,7 +296,7 @@ AIRLINES = [
     ("KLM Royal Dutch Airlines", r"\bKLM\b", {r"city ?hopper": "KLM Cityhopper", r"\bexel\b": "KLM Exel", r"cargo": "KLM Cargo", r"aeroclub": "KLM Aeroclub"}, r"viasa"),
     ("All Nippon Airways (ANA)", r"\bANA\b|All Nippon", {r"\bwings\b": "ANA Wings", r"cargo": "ANA Cargo"}, r"ansett|torch"),
     ("Japan Airlines (JAL)", r"\bJAL\b|Jal No|Japan Air ?[Ll]ines", {r"cargo": "JAL Cargo", r"express": "JAL Express"}, r"torch|system"),
-    ("US Air Force", r"\bUSAF\b|United States Air Force|\bU\.?S\.? Air Force|\bUs Air Force", {}, None),
+    ("US Air Force", r"\bUSAF\b|United States Air Force|\bU\.?S\.? Air Force|\bUs Air Force|\bUSA ?-? ?Air Force", {}, None),
     ("Royal Air Force", r"\bRAF\b|Royal Air Force", {}, r"australian|canadian|new zealand|saudi|netherlands|danish|norwegian|thai|malaysian|jordanian|moroccan|oman|brunei|bahrain"),
     ("Delta Air Lines", r"\bDelta\b", {r"connection": "Delta Connection", r"express": "Delta Express", r"shuttle": "Delta Shuttle"}, None),
     ("Cathay Pacific", r"Cathay Pacific|Cathay Cargo|^Cathay\b", {r"cargo": "Cathay Pacific Cargo", r"dragon": "Cathay Dragon"}, None),

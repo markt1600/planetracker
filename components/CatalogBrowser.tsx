@@ -11,6 +11,7 @@ type Facet = { value: string; n: number };
 type Result = CatalogModel & { owned?: boolean; wished?: boolean };
 type Wish = { catalogId: string; model: CatalogModel };
 const PAGE = 36;
+const CATALOG_SORTS = { default: "Best match", name: "Name", airline: "Airline", price: "Price", brand: "Manufacturer", number: "Model number" } as const;
 
 export default function CatalogBrowser({ brands, scales, families, airlines, currency, toSGD }: { brands: Facet[]; scales: Facet[]; families: Facet[]; airlines: Facet[]; currency: string; toSGD: Record<string, number> }) {
   const [q, setQ] = useState("");
@@ -18,6 +19,8 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
   const [scale, setScale] = useState("");
   const [family, setFamily] = useState("");
   const [airline, setAirline] = useState("");
+  const [sort, setSort] = useState<keyof typeof CATALOG_SORTS>("default");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
   const [data, setData] = useState<{ key: string; total: number; results: Result[] }>({ key: "", total: 0, results: [] });
   const [more, setMore] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -57,7 +60,7 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
     }
   };
 
-  const key = JSON.stringify([q, brand, scale, family, airline]);
+  const key = JSON.stringify([q, brand, scale, family, airline, sort, dir]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -67,7 +70,7 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams({ q, brand, scale, family, airline, limit: String(PAGE), offset: String(offset) });
+        const params = new URLSearchParams({ q, brand, scale, family, airline, sort, dir, limit: String(PAGE), offset: String(offset) });
         const res = await api<{ total: number; results: Result[] }>(`/api/catalog/search?${params}`, { signal: ctrl.signal });
         setData((d) => ({ key, total: res.total, results: fresh ? res.results : [...d.results, ...res.results] }));
         setLoading(false);
@@ -110,6 +113,16 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
               <option key={a.value} value={a.value}>{`${a.n} models`}</option>
             ))}
           </datalist>
+        </div>
+        <div className="col-span-2 flex gap-2 sm:col-span-1">
+          <select className="field min-w-0 sm:!w-auto" value={sort} onChange={(e) => { const k = e.target.value as keyof typeof CATALOG_SORTS; setSort(k); setDir(k === "price" ? "desc" : "asc"); }} aria-label="Sort by">
+            {Object.entries(CATALOG_SORTS).map(([k, v]) => <option key={k} value={k}>Sort: {v}</option>)}
+          </select>
+          {sort !== "default" && (
+            <button type="button" className="btn btn-ghost shrink-0 !rounded-xl !px-3" onClick={() => setDir(dir === "asc" ? "desc" : "asc")} title={`${sort === "price" ? (dir === "desc" ? "High to low" : "Low to high") : dir === "asc" ? "A to Z" : "Z to A"} — tap to reverse`} aria-label={`Order: ${sort === "price" ? (dir === "desc" ? "high to low" : "low to high") : dir === "asc" ? "A to Z" : "Z to A"}. Tap to reverse.`}>
+              <span aria-hidden>{dir === "asc" ? "↑" : "↓"}</span>
+            </button>
+          )}
         </div>
       </div>
       <p className="label mt-4">{data.key === key ? `${data.total.toLocaleString("en")} models` : "Searching…"}</p>

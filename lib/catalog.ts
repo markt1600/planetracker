@@ -60,9 +60,13 @@ export const getModel = (id: string, custom: CatalogModel[] = []) => {
 };
 export const allModels = () => load().models;
 
-export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; airline?: string; limit?: number; offset?: number; custom?: CatalogModel[] };
+/** Title as sorted: without a leading "(Ultimate Collection)"-style label or punctuation. */
+const sortName = (title: string) => title.replace(/^(\([^)]*\)|[^A-Za-z0-9])+\s*/, "");
 
-export function searchCatalog({ q = "", brand, scale, family, airline = "", limit = 24, offset = 0, custom = [] }: SearchOptions) {
+export type SearchOptions = { q?: string; brand?: string; scale?: string; family?: string; airline?: string; limit?: number; offset?: number; custom?: CatalogModel[]; sort?: CatalogSort; dir?: "asc" | "desc"; valueOf?: (m: CatalogModel) => number | null };
+export type CatalogSort = "default" | "name" | "airline" | "price" | "number" | "brand";
+
+export function searchCatalog({ q = "", brand, scale, family, airline = "", limit = 24, offset = 0, custom = [], sort = "default", dir = "asc", valueOf }: SearchOptions) {
   const wanted = airline.toLowerCase().split(/\s+/).filter(Boolean);
   const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
   const qNum = squash(q);
@@ -90,6 +94,19 @@ export function searchCatalog({ q = "", brand, scale, family, airline = "", limi
       if (!all && score < 40) continue;
     }
     scored.push({ model: m, score });
+  }
+  if (sort !== "default") {
+    const read = { name: (m: CatalogModel) => sortName(m.title), airline: (m: CatalogModel) => m.airline, number: (m: CatalogModel) => m.modelNumber, brand: (m: CatalogModel) => m.brand, price: (m: CatalogModel) => valueOf?.(m) ?? null }[sort];
+    const sign = dir === "asc" ? 1 : -1;
+    const keyed = scored.map((s) => ({ s, v: read(s.model) }));
+    keyed.sort((a, b) => {
+      // Models without the value (no price, no airline) go last in either direction.
+      if (a.v == null || a.v === "") return b.v == null || b.v === "" ? 0 : 1;
+      if (b.v == null || b.v === "") return -1;
+      const c = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v), "en", { numeric: true });
+      return c * sign || a.s.model.title.localeCompare(b.s.model.title);
+    });
+    return { total: keyed.length, results: keyed.slice(offset, offset + limit).map((k) => k.s.model) };
   }
   if (tokens.length) scored.sort((a, b) => b.score - a.score);
   return { total: scored.length, results: scored.slice(offset, offset + limit).map((s) => s.model) };
