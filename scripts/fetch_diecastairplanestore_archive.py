@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -72,7 +73,10 @@ def main():
     urls = []
     for page in (1, 2, 3, 4):
         time.sleep(PAUSE)
-        found = re.findall(r"<loc>([^<]+)</loc>", fetch(f"{BASE}/xmlsitemap.php?type=products&page={page}"))
+        try:
+            found = re.findall(r"<loc>([^<]+)</loc>", fetch(f"{BASE}/xmlsitemap.php?type=products&page={page}"))
+        except urllib.error.HTTPError:
+            break  # past the last sitemap page
         if not found:
             break
         urls += found
