@@ -54,9 +54,12 @@ def main():
     recs = json.load(open(os.path.join(ROOT, "data", "catalog.json")))
     # Main photo is <id>.webp; extra photos from other retailers are <id>-2.webp, <id>-3.webp ...
     jobs = []
+    dupes_path = os.path.join(ROOT, "data", "duplicate-photos.json")
+    repeated = set(json.load(open(dupes_path))) if os.path.exists(dupes_path) else set()
     for r in recs:
         jobs.append((r["id"], r.get("remoteImage")))
-        jobs += [(f"{r['id']}-{n + 2}", u) for n, u in enumerate(r.get("remoteGallery") or [])]
+        # Skip extras already found to be the same picture as one we keep.
+        jobs += [(f"{r['id']}-{n + 2}", u) for n, u in enumerate(r.get("remoteGallery") or []) if f"{r['id']}-{n + 2}" not in repeated]
     slow = [j for j in jobs if any(h in (j[1] or "") for h in SLOW_HOSTS)]
     fast = [j for j in jobs if j not in slow]
     counts = {}

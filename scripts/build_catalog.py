@@ -13,7 +13,8 @@ Sources (all public storefront product feeds):
 Usage:
   python3 scripts/build_catalog.py           # rebuild from .cache/catalog-raw
   python3 scripts/build_catalog.py --fetch   # re-download the feeds first (polite, ~5 min)
-  python3 scripts/fetch_images.py            # then store photos locally and re-run this script
+  python3 scripts/fetch_images.py            # then store photos locally
+  python3 scripts/dedupe_images.py           # drop photos that repeat one already stored, and re-run this script
 """
 import glob
 import html
@@ -887,6 +888,8 @@ def main():
 
     out = []
     aliases = {}
+    dupes_path = os.path.join(OUT, "duplicate-photos.json")
+    repeated_photos = set(json.load(open(dupes_path))) if os.path.exists(dupes_path) else set()
     for k, m in merged.items():
         if not m["scale"]:
             continue
@@ -904,8 +907,10 @@ def main():
         rec["prices"] = sorted(m["prices"], key=lambda x: bool(x.get("condition")))  # imperfect-copy offers listed last
         extra = list(dict.fromkeys(m.get("extra") or []))[:8]
         rec["remoteGallery"] = extra
+        # Photos that repeat one already shown (see scripts/dedupe_images.py) are left out.
         rec["gallery"] = [f"/catalog/{slug}-{n + 2}.webp" for n in range(len(extra))
-                          if os.path.exists(os.path.join(ROOT, "public", "catalog", f"{slug}-{n + 2}.webp"))]
+                          if f"{slug}-{n + 2}" not in repeated_photos
+                          and os.path.exists(os.path.join(ROOT, "public", "catalog", f"{slug}-{n + 2}.webp"))]
         out.append({a: b for a, b in rec.items() if b not in (None, "", [])})
     # Hand-added models (data/catalog-extra.json) are kept across rebuilds and win over scraped records.
     extra_path = os.path.join(OUT, "catalog-extra.json")
