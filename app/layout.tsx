@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-6 sm:px-6">{children}</main>
         <footer className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6">
           <p className="label !normal-case !tracking-normal text-faint">
-            Catalogue photos and prices come from Airplane Model SG, Aviation Retail Direct, The Airplane Shop, West Coast Diecast, Aircraft Model Store and ScaleModelStore. Prices are a guide, not a valuation,
+            Catalogue photos and prices come from Airplane Model SG, Aviation Retail Direct, The Airplane Shop, West Coast Diecast, Aircraft Model Store, ScaleModelStore and Diecast Airplane Store. Prices are a guide, not a valuation,
             and are converted to your display currency at {fx.live ? `exchange rates from ${fx.asOf}` : "approximate exchange rates"}.
           </p>
         </footer>

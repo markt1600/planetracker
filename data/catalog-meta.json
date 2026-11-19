@@ -1,6 +1,6 @@
 {
   "builtAt": "2026-11-19",
-  "count": 8631,
+  "count": 9315,
   "brands": [
     "GeminiJets",
     "JC Wings",
@@ -40,7 +40,8 @@
     "Oxford Aviation",
     "Postage Stamp",
     "AviaBoss",
-    "ARD Models"
+    "ARD Models",
+    "YY Wings"
   ],
   "fx": {
     "base": "SGD",
@@ -62,6 +63,7 @@
     "airplaneshop.com",
     "westcoastdiecast.ca",
     "aircraftmodelstore.co.uk",
-    "scalemodelstore.com"
+    "scalemodelstore.com",
+    "diecastairplanestore.com"
   ]
 }

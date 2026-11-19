@@ -7,6 +7,7 @@ Sources (all public storefront product feeds):
   tas   airplaneshop.com          Shopify products.json   prices in USD
   wcd   westcoastdiecast.ca       Shopify products.json   prices in CAD
   ams   aircraftmodelstore.co.uk  Shopify products.json   prices in GBP (die-cast only)
+  das   diecastairplanestore.com   brand listings (run scripts/fetch_diecastairplanestore.py)   prices in USD
   sms   scalemodelstore.com       model pages (run scripts/fetch_scalemodelstore.py)   prices in EUR
 
 Usage:
@@ -37,7 +38,7 @@ BRANDS = [
     "YU Model", "Patriot Models", "HYJL Wings", "Dragon Wings", "Apollo",
     "Hobby Master", "B Models", "KJ Models", "WLTK", "Aether Model", "Kylin Model", "El Aviador", "Legacy Jets",
     "JFox", "JetX", "Retro Models", "Fantasy Wings", "Hogan", "Limox", "ODEWM", "Oxford Aviation", "Postage Stamp",
-    "AviaBoss", "ARD Models",
+    "AviaBoss", "ARD Models", "YY Wings",
 ]
 MORE_BRANDS = (("panda", "Panda Models"), ("sq wings", "SQ Wings"), ("hx ", "HX Wings"), ("aeropolaris", "Aero Polaris"),
                ("aero polaris", "Aero Polaris"), ("^c model", "C Models"), ("big bird", "Big Bird"), ("v1 models", "V1 Models"),
@@ -167,7 +168,7 @@ ACCESSORY_RE = re.compile(
     r"aircraft parking|fire station|tow ?bar|landing gear set|gears? set|engine set|catalog(?:ue)?|book|magazine|sticker|decal|puzzle|plush|"
     r"t-shirt|mug\b|luggage|airport (?:set|accessor)|accessor|snap[- ]?fit|blind box|"
     r"weapons? pack|landing gear|jet blast|scenix|flood ?lights?|container loader|boarding station|fire engine|passenger gate|"
-    r"airport (?:building|tower|fire)|construction kit|\bvehicles\b|\bvan set\b|marshall?er|apa system|\d\s*pcs?\b|\bpieces\b)", re.I)
+    r"airport (?:building|tower|fire)|construction kit|\bvehicles\b|\bvan set\b|marshall?er|apa system|carrier deck|display deck|diorama|\d\s*pcs?\b|\bpieces\b)", re.I)
 QUOTE_RE = re.compile(r"[“\"‘']{1,2}\s?([^”\"’']{3,90}?)\s?[”\"’″']{1,2}")
 
 
@@ -332,6 +333,8 @@ def norm_key(brand, number):
     if brand == "YU Model": k = re.sub(r"^(YU400|YU|Y)(?=\d)", "", k)  # YU40030001 / Y30001 / 30001
     if brand == "JC Wings": k = re.sub(r"^(JC|X)(?=\d)", "XX", k)  # JC4430 / X40020 are XX numbers
     if brand == "Aviation 400": k = re.sub(r"^(AV|WB)(?=\d)", "", k)  # AV4077 / WB4077
+    if brand == "V1 Models": k = re.sub(r"^V1(?=\d)", "", k)  # V1-400008 / 400008
+    if brand == "InFlight200": k = re.sub(r"^IF(?=\d+$)", "", k)  # IF54651 / 54651
     return brand + "|" + k
 
 
@@ -456,6 +459,14 @@ def true_brand(brand, number):
     """Some retailers file a model under a sister brand; the number format says who really made it."""
     n = re.sub(r"[^A-Z0-9]", "", number.upper())
     if n.startswith("KJ"): return "KJ Models"
+    # InFlight's sister brands are often filed under "InFlight200".
+    if brand == "InFlight200":
+        if n.startswith("JF"): return "JFox"  # JF-737-8-043, JF-A300-006
+        if re.match(r"^B\d{3}", n): return "B Models"  # B-773-ANA-52A, B-722-251
+        if n.startswith("ARD"): return "ARD Models"
+        if n.startswith("EAV"): return "El Aviador"
+        if re.match(r"^RM\d", n): return "Retro Models"
+    if re.match(r"^YY\d", n) and brand in ("AeroClassics", "YY Wings"): return "YY Wings"
     if re.match(r"^L2\d{3}", n) and brand in ("JC Wings", "SQ Wings"): return "SQ Wings"
     if re.match(r"^5\d{5}(\d{3})?$", n) and brand == "JC Wings": return "Herpa Wings"
     if re.match(r"^C0\d{3}", n) and brand in ("Panda Models", "Aero Polaris", "C Models"): return "C Models"
@@ -718,6 +729,58 @@ def rec_sms(r):
                 notes="; ".join(notes)[:160] or None)
 
 
+DAS_BRANDS = {
+    "inflight200": "InFlight200", "hobby master": "Hobby Master", "sq wings": "SQ Wings", "gemini jets": "GeminiJets",
+    "geminijets": "GeminiJets", "gemini200": "GeminiJets", "geminimacs": "GeminiJets", "gemini100": "GeminiJets",
+    "jc wings": "JC Wings", "ng model": "NG Models", "hx models": "HX Wings", "jfox": "JFox", "yy wings": "YY Wings",
+    "b-models": "B Models", "apollo": "Apollo", "aviation400": "Aviation 400", "aviation200": "Aviation 400",
+    "wb models": "Aviation 400", "aero polaris": "Aero Polaris", "ard200": "ARD Models", "v1-400": "V1 Models",
+    "panda models": "Panda Models", "phoenix model": "Phoenix Models", "herpa 1:500": "Herpa Wings", "herpa 1:200": "Herpa Wings",
+    "legacy jets": "Legacy Jets", "el aviador": "El Aviador", "aviaboss": "AviaBoss", "retro models": "Retro Models",
+    "jet-x": "JetX", "postage stamp planes": "Postage Stamp",
+}
+DAS_PREFIX = re.compile(r"^(?:NG Models?|Gemini ?Jets|Gemini ?200|GeminiMACS|Gemini ?100|JC Wings|In[Ff]light ?200|Hobby Master|SQ Wings|"
+                        r"HX Models|JFox|YY Wings|B-Models|Apollo|Aviation ?[24]00|WB Models|Aero ?Polaris|ARD ?200|V1[- ]?400|"
+                        r"Panda Models?|Phoenix(?: Models?)?|Herpa(?: Wings)?|Legacy Jets|El Aviador|AviaBoss|Retro Models|Jet-?X|"
+                        r"Postage Stamp)\s+", re.I)
+
+
+def rec_das(c):
+    """One product card from a diecastairplanestore.com brand listing."""
+    brand = DAS_BRANDS.get((c.get("brand") or "").strip().lower())
+    # The picture's caption is the fuller title (it includes the livery); both end "<number> [Scale] 1:NNN".
+    text = clean(c.get("alt") or c.get("title") or "")
+    m = re.search(r"\s(\S*\d\S*)\s+(?:Scale\s+)?1:(\d+)\s*$", text) or re.search(r"\s(\S*\d\S*)\s+(?:Scale\s+)?1:(\d+)\s*$", clean(c.get("title") or ""))
+    if not brand or not m:
+        return None
+    number = m.group(1).strip(",.").upper()
+    desc = DAS_PREFIX.sub("", text[:m.start()].strip(), count=1)
+    desc = re.sub(r"\bReg:\s*", "", desc)
+    desc = re.sub(r"\s*\(?(?:includes|with|w/) stand\)?", "", desc, flags=re.I).strip(" ,")
+    if len(number) < 3 or not desc or ACCESSORY_RE.search(desc):
+        return None
+    if brand == "NG Models" and number.isdigit(): number = "NG" + number
+    if brand == "Phoenix Models" and number.isdigit(): number = "PH" + number
+    info = parse(desc, airline_first=True)
+    # The shop shows a stock "no picture" graphic for some products; that is not a photo of the model.
+    image = re.sub(r"/stencil/\d+x\d+/", "/stencil/1280x1280/", c["image"]) if c.get("image") and "ProductDefault" not in c["image"] else None
+    price = {"source": "Diecast Airplane Store", "amount": c["usd"], "currency": "USD", "url": c["url"],
+             "inStock": not c.get("soldOut")} if c.get("usd") else None
+    return dict(brand=brand, number=number, scale="1:" + m.group(2), title=desc, image=image, thumb=None, more=[],
+                description=None, price=price, **info)
+
+
+def load_das():
+    path = os.path.join(RAW, "das", "cards.jsonl")
+    seen, out = set(), []
+    for line in (open(path) if os.path.exists(path) else []):
+        c = json.loads(line)
+        if c["url"] not in seen:
+            seen.add(c["url"])
+            out.append(c)
+    return out
+
+
 def load_sms():
     path = os.path.join(RAW, "sms", "pages.jsonl")
     return [json.loads(line) for line in open(path)] if os.path.exists(path) else []
@@ -775,12 +838,27 @@ def main():
     for p in load_sms():
         r = rec_sms(p)
         if r: recs.append(r)
-    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd+ams {n4 - n3}, sms {len(recs) - n4}")
+    n5 = len(recs)
+    for c in load_das():  # last, so its photos are added after the ones already stored
+        r = rec_das(c)
+        if r: recs.append(r)
+    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd+ams {n4 - n3}, sms {n5 - n4}, das {len(recs) - n5}")
 
     merged = {}
+    # A shop that files a sister brand under "InFlight200": use the brand everyone else gives that number.
+    plain = lambda n: re.sub(r"[^A-Z0-9]", "", n.upper())
+    elsewhere = {}
+    for r in recs:
+        if r["brand"] != "InFlight200": elsewhere.setdefault(plain(r["number"]), set()).add(r["brand"])
+    for r in recs:
+        others = elsewhere.get(plain(r["number"]), set())
+        if r["brand"] == "InFlight200" and len(others) == 1:
+            r["filed_slug"] = slug_of(r["brand"], r.get("filed_number") or r["number"])  # so its old address still resolves
+            r["brand"] = next(iter(others))
     gemini_keys(recs)
     for r in recs:
-        filed_as = slug_of(r["brand"], r.pop("filed_number", None) or r["number"])
+        filed_as = r.pop("filed_slug", None) or slug_of(r["brand"], r.get("filed_number") or r["number"])
+        r.pop("filed_number", None)
         r["brand"] = true_brand(r["brand"], r["number"])
         r["scale"] = r["scale"] or DEFAULT_SCALE.get(r["brand"])
         k = norm_key(r["brand"], r.get("key_number") or r["number"])
@@ -841,7 +919,7 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     meta = {"builtAt": date.today().isoformat(), "count": len(out), "brands": BRANDS, "fx": fx_rates(),
-            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "aircraftmodelstore.co.uk", "scalemodelstore.com"]}
+            "sources": ["airplanemodelsg.com", "aviationretaildirect.com", "airplaneshop.com", "westcoastdiecast.ca", "aircraftmodelstore.co.uk", "scalemodelstore.com", "diecastairplanestore.com"]}
     json.dump(out, open(os.path.join(OUT, "catalog.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     json.dump(meta, open(os.path.join(OUT, "catalog-meta.json"), "w"), indent=2)
     json.dump(dict(sorted(airline_aliases.items())), open(os.path.join(OUT, "airline-aliases.json"), "w"), ensure_ascii=False, indent=0)
