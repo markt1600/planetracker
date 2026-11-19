@@ -181,6 +181,54 @@ def strip_html(s):
     return clean(re.sub(r"<[^>]+>", " ", s or ""))
 
 
+# Shop talk that has no place in a reference catalogue: ordering, stock, shipping, sales, contact details.
+SHOP_PHRASES = re.compile(
+    r"\S+@\S+\.\w+|(?:https?://|www\.)\S+|\|\||"
+    r"any questions,? please (?:e-?mail|contact)(?: us)?(?: at)?|please (?:e-?mail|contact|call|get in touch with) us[^.!?]*|"
+    r"sold as[- ]is|final sale|all sales (?:are )?final|no returns?(?: or refunds?)?|"
+    r"pre-?order etas? are estimates,? not guarantees\.?|"
+    r"if you(?:'|’)?d like your in-stock items shipped first[^.!?]*[.!?]?|"
+    r"\b\d/\d{2,3} scale\s+(?=made by)|\bmade by [A-Z][\w&:.' -]*?(?=\s+(?:die-?cast|fully|antennas?|$))|\bdie-?cast model\b|\bfully assembled\b",
+    re.I)
+SHOP_SENTENCE = re.compile(
+    r"pre-?order|\beta\b|\betas\b|\bdue\b|expected|delivery|dates? may change|in[- ]stock|out of stock|back ?order|restock|"
+    r"\bship|postage|dispatch|\bsale\b|\bsold\b|discount|\bprice|\brrp\b|\bmsrp\b|refund|\breturns?\b|warranty|"
+    r"e-?mail|contact us|get in touch|customer|\border(?:s|ed|ing)?\b|deposit|cancel|reserve|per customer|"
+    r"pre-?owned|second[- ]hand|shelf wear|packaging may|as[- ]is|adult collectible|ages? \d+\+?|not a toy|choking|"
+    r"future releases?|release date|newsletter|notify|click|website|our (?:shop|store)|we (?:will|can|do|are|have|offer)\b|"
+    r"[£$€]\s?\d", re.I)
+
+
+def clean_description(text, limit=400):
+    """Keep what describes the model (stand, gear, size, edition, history); drop anything about buying it."""
+    text = strip_html(text)
+    text = re.sub(r"^.{0,160}?\bAircraft Scale Model\b\s*", "", text)  # the shop's own title repeated up front
+    text = re.sub(r"^.{0,40}?\b1/\d+\s+(?:\([^)]*\)\s+)?(?=This )", "", text)  # "A320-200 1/200 This die-cast ..."
+    # A flattened spec table ("Brand X Scale 1/400 Aircraft ... Length 17.5 cm ... Features ...") repeats
+    # fields the catalogue already has; keep only the length and features from it.
+    table = re.search(r"\s*\bBrand [\w' ]+? Scale 1/\d+ .*$", text)
+    if table:
+        length = re.search(r"\bLength ([\d.]+ ?cm)", table.group(0))
+        features = re.search(r"\bFeatures (.+?)\.?$", table.group(0))
+        tail = (f" Model length {length.group(1)}." if length else "") + (f" Features: {features.group(1).strip().lower()}." if features else "")
+        text = text[:table.start()] + tail
+    text = SHOP_PHRASES.sub(" ", text)
+    keep = []
+    for part in re.split(r"(?<=[.!?])\s+", text):
+        part = re.sub(r"\s+", " ", part).strip(" -–|,;:")
+        if len(part) < 4 or SHOP_SENTENCE.search(part) or " | " in part or re.fullmatch(r"[\w' ]{2,30} 1:\d+ scale model\.?", part):
+            continue  # shop talk, a repeated title line, or "InFlight200 1:200 scale model."
+        if part.isupper() and len(part) > 12:
+            part = part.capitalize()
+        keep.append(part if part[-1] in ".!?" else part + ".")
+    out = ""
+    for part in keep:  # stop at a whole sentence rather than cutting one in half
+        if len(out) + len(part) + 1 > limit:
+            break
+        out = (out + " " + part).strip()
+    return out if len(out) >= 12 else None
+
+
 def find_type(text):
     best = None
     for fam, rx in FAM_RE:
@@ -505,7 +553,7 @@ def rec_amsg(p):
     price = {"source": "Airplane Model SG", "amount": amt, "currency": pr["currency_code"],
              "url": p["permalink"], "inStock": bool(p.get("is_in_stock"))} if amt > 0 else None
     return dict(brand=brand, number=number, scale=scale, title=rest, image=image, thumb=thumb,
-                description=strip_html(p.get("short_description") or p.get("description"))[:400] or None,
+                description=clean_description(p.get("short_description") or p.get("description")),
                 price=price, **info)
 
 
@@ -599,7 +647,7 @@ def rec_shopify(p, source, currency, base):
     price = {"source": name, "amount": amt, "currency": currency,
              "url": f"{base}/products/{p['handle']}", "inStock": bool(v.get("available"))} if amt > 0 else None
     return dict(brand=brand, number=number, scale=scale, title=desc, image=image, thumb=thumb, more=more,
-                description=strip_html(p.get("body_html"))[:400] or None, price=price, **info)
+                description=clean_description(p.get("body_html")), price=price, **info)
 
 
 SMS_BRANDS = {
