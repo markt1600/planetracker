@@ -646,6 +646,12 @@ def rec_shopify(p, source, currency, base):
     name = {"ard": "Aviation Retail Direct", "tas": "The Airplane Shop", "wcd": "West Coast Diecast", "ams": "Aircraft Model Store"}[source]
     price = {"source": name, "amount": amt, "currency": currency,
              "url": f"{base}/products/{p['handle']}", "inStock": bool(v.get("available"))} if amt > 0 else None
+    # A second-hand or damaged copy is still the same model; say so on the price rather than in the title.
+    worn = re.search(r"[*#\s]*\b(PRE-?OWNED|DAMAGED(?: BOX)?)\b[*\s]*", desc, flags=re.I)
+    if worn:
+        condition = "pre-owned" if worn.group(1).upper().startswith("PRE") else worn.group(1).lower()
+        desc = (desc[:worn.start()] + " " + desc[worn.end():]).strip()
+        if price: price.update(source=f"{name} ({condition})", condition=condition)
     return dict(brand=brand, number=number, scale=scale, title=desc, image=image, thumb=thumb, more=more,
                 description=clean_description(p.get("body_html")), price=price, **info)
 
@@ -670,6 +676,14 @@ def rec_sms(r):
     number = clean(r.get("mpn") or "").upper()
     if not brand or len(number) < 3 or "error" in r:
         return None
+    # The shop lists imperfect copies (dented box, paint flaw) as separate products with a suffix on the
+    # number. They are the same model: fold them into it as an extra, clearly labelled price.
+    filed, condition = number, None
+    vm = re.match(r"^(.+?)_((?:DAMAGED?|PAINT|BOX\d*|PLINTH|COVER|SKEW|NO|STAND)(?:_[A-Z0-9]+)*)$", number)
+    if vm:
+        number, flaw = vm.group(1), vm.group(2)
+        condition = ("missing engines" if "ENGINE" in flaw else "skewed tail" if "SKEW" in flaw else "paint flaw" if "PAINT" in flaw
+                     else "damaged stand" if re.search("PLINTH|STAND", flaw) else "damaged cover" if "COVER" in flaw else "damaged box")
     parts = [x.strip() for x in (r.get("detail") or "").split("|")]
     airline = parts[1] if len(parts) > 2 else None
     kind = parts[2] if len(parts) > 2 else None
@@ -694,7 +708,10 @@ def rec_sms(r):
     imgs = ["https://www.scalemodelstore.com" + i for i in (r.get("images") or [])]
     price = {"source": "ScaleModelStore", "amount": r["eur"], "currency": "EUR", "url": r["url"],
              "inStock": bool(r.get("inStock"))} if r.get("eur") else None
-    return dict(brand=brand, number=number, scale="1:" + m.group(1), title=title, image=imgs[0] if imgs else None,
+    if condition:
+        imgs = []  # photos of the flaw are not catalogue photos
+        if price: price.update(source=f"ScaleModelStore ({condition})", condition=condition)
+    return dict(brand=brand, number=number, filed_number=filed, scale="1:" + m.group(1), title=title, image=imgs[0] if imgs else None,
                 thumb=None, more=[], description=None, price=price, type=tidy_type(t[1].group(0)) if t else clean(kind)[:40],
                 family=t[0] if t else None, reg=reg, airline=tidy_airline(airline) if airline else None,
                 notes="; ".join(notes)[:160] or None)
@@ -762,7 +779,7 @@ def main():
     merged = {}
     gemini_keys(recs)
     for r in recs:
-        filed_as = slug_of(r["brand"], r["number"])
+        filed_as = slug_of(r["brand"], r.pop("filed_number", None) or r["number"])
         r["brand"] = true_brand(r["brand"], r["number"])
         r["scale"] = r["scale"] or DEFAULT_SCALE.get(r["brand"])
         k = norm_key(r["brand"], r.get("key_number") or r["number"])
@@ -805,6 +822,7 @@ def main():
                "image": f"/catalog/{slug}.webp" if os.path.exists(os.path.join(ROOT, "public", "catalog", slug + ".webp")) else m["image"],
                "description": m["description"], "prices": m["prices"]}
         rec["aka"] = sorted(n for n in m["numbers"] if n != m["display"])
+        rec["prices"] = sorted(m["prices"], key=lambda x: bool(x.get("condition")))  # imperfect-copy offers listed last
         extra = list(dict.fromkeys(m.get("extra") or []))[:3]
         rec["remoteGallery"] = extra
         rec["gallery"] = [f"/catalog/{slug}-{n + 2}.webp" for n in range(len(extra))

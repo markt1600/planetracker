@@ -27,7 +27,9 @@ export const PREFERRED_SOURCE = "Airplane Model SG";
 /** Best price guess in the target currency. Airplane Model SG wins when it lists the model. */
 export function estimatePrice(prices: Price[] | undefined, target: string, toSGD: Record<string, number>) {
   if (!prices?.length) return null;
-  const ordered = [...prices].sort((a, b) => Number(b.source === PREFERRED_SOURCE) - Number(a.source === PREFERRED_SOURCE));
+  // Offers for damaged or pre-owned copies only count when nothing else is listed.
+  const rank = (p: Price) => (p.condition ? 2 : p.source === PREFERRED_SOURCE ? 0 : 1);
+  const ordered = [...prices].sort((a, b) => rank(a) - rank(b));
   for (const p of ordered) {
     const amount = convert(p.amount, p.currency, target, toSGD);
     if (amount != null) {

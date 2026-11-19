@@ -4,6 +4,8 @@ export type Price = {
   currency: string;
   url?: string;
   inStock?: boolean;
+  /** Set when the offer is for an imperfect copy, e.g. "damaged box" or "pre-owned". */
+  condition?: string;
 };
 
 /** A model in the shared catalogue (data/catalog.json). */
