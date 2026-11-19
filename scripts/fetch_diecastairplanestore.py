@@ -29,13 +29,14 @@ def fetch(url):
 def cards(page, brand):
     out = []
     for c in re.findall(r'<article[^>]*class="[^"]*card[^"]*".*?</article>', page, flags=re.S):
-        link = re.search(r'<a href="([^"]+)" class="card-figure__link" aria-label="([^"]*)"', c)
-        img = re.search(r'data-src="([^"]+)"[^>]*alt="([^"]*)"', c)
+        # Attributes are spread over several lines in the page source.
+        link = re.search(r'<a\s+href="([^"]+)"\s+class="card-figure__link"\s+aria-label="([^"]*)"', c, flags=re.S)
+        img = re.search(r'data-src="([^"]+)"[^>]*?alt="([^"]*)"', c, flags=re.S)
         if not link:
             continue
         label = html.unescape(link.group(2))
         price = re.search(r"(?:Now|Price)?:?\s*\$([\d,]+\.\d\d)\s*$", label.strip()) or re.search(r"\$([\d,]+\.\d\d)", c)
-        out.append({"brand": brand, "url": html.unescape(link.group(1)), "title": re.sub(r",\s*(Was:.*|\$[\d,.]+.*)$", "", label).strip(),
+        out.append({"brand": brand, "url": html.unescape(link.group(1)), "title": re.sub(r",\s*(Was:.*|Now:.*|\$[\d,.]+.*)$", "", label, flags=re.S).strip(),
                     "alt": html.unescape(img.group(2)) if img else None, "image": img.group(1) if img else None,
                     "usd": float(price.group(1).replace(",", "")) if price else None,
                     "preorder": "Pre-Order" in c, "soldOut": "Out of stock" in c or "Sold Out" in c})
