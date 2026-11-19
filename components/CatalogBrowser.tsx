@@ -25,6 +25,8 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
   const [more, setMore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Result | null>(null);
+  /** Which photo of the open model is showing large; null means its main photo. */
+  const [shot, setShot] = useState<string | null>(null);
   const [wishes, setWishes] = useState<Wish[] | null>(null);
   const [wishNote, setWishNote] = useState<{ full?: boolean; text?: string }>({});
   const [wishBusy, setWishBusy] = useState(false);
@@ -131,7 +133,7 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
         {data.results.map((m) => {
           const est = estimatePrice(m.prices, currency, toSGD);
           return (
-            <button key={m.id} onClick={() => { setOpen(m); setWishNote({}); }} className="panel overflow-hidden text-left transition hover:-translate-y-0.5 hover:border-sky/60">
+            <button key={m.id} onClick={() => { setOpen(m); setShot(null); setWishNote({}); }} className="panel overflow-hidden text-left transition hover:-translate-y-0.5 hover:border-sky/60">
               <div className="relative">
                 <PlaneImage sources={[m.image, m.remoteImage]} alt={m.title} className="aspect-[4/3]" />
                 {m.owned && <span className="chip chip-amber absolute left-2 top-2 !bg-night/85">In hangar</span>}
@@ -172,13 +174,13 @@ export default function CatalogBrowser({ brands, scales, families, airlines, cur
           <div className="panel rise mx-auto max-w-3xl !rounded-none !bg-panel sm:!rounded-3xl" onClick={(e) => e.stopPropagation()}>
             <div className="grid md:grid-cols-2">
               <div>
-                <PlaneImage sources={[open.image, open.remoteImage]} alt={open.title} className="aspect-[4/3] sm:rounded-tl-3xl" />
+                <PlaneImage sources={[shot ?? open.image, open.remoteImage]} alt={open.title} className="aspect-[4/3] sm:rounded-tl-3xl" />
                 {open.gallery && open.gallery.length > 0 && (
                   <div className="flex flex-wrap gap-2 p-3 pb-0">
-                    {open.gallery.map((u) => (
-                      <a key={u} href={u} target="_blank" rel="noreferrer">
-                        <PlaneImage sources={[u]} alt="More views" fit="cover" className="h-16 w-20 rounded-lg" />
-                      </a>
+                    {[open.image, ...open.gallery].filter(Boolean).map((u, i) => (
+                      <button key={u} type="button" onClick={() => setShot(u!)} aria-label={`Photo ${i + 1}`} aria-pressed={(shot ?? open.image) === u} className={`overflow-hidden rounded-lg border-2 ${(shot ?? open.image) === u ? "border-amber" : "border-transparent"}`}>
+                        <PlaneImage sources={[u]} alt="" fit="cover" className="h-12 w-16" />
+                      </button>
                     ))}
                   </div>
                 )}

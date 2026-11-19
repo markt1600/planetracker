@@ -638,7 +638,8 @@ def rec_shopify(p, source, currency, base):
     imgs = p.get("images") or []
     image = shopify_img(imgs[0]["src"], 800) if imgs else None
     thumb = shopify_img(imgs[0]["src"], 360) if imgs else None
-    more = [shopify_img(i["src"], 800) for i in imgs[1:2]] if source in ("wcd", "ams") else []
+    # Aircraft Model Store photographs models from several angles; keep up to five more of those.
+    more = [shopify_img(i["src"], 800) for i in imgs[1:(6 if source == "ams" else 2)]] if source in ("wcd", "ams") else []
     try:
         amt = float(v.get("price") or 0)
     except ValueError:
@@ -823,7 +824,7 @@ def main():
                "description": m["description"], "prices": m["prices"]}
         rec["aka"] = sorted(n for n in m["numbers"] if n != m["display"])
         rec["prices"] = sorted(m["prices"], key=lambda x: bool(x.get("condition")))  # imperfect-copy offers listed last
-        extra = list(dict.fromkeys(m.get("extra") or []))[:3]
+        extra = list(dict.fromkeys(m.get("extra") or []))[:8]
         rec["remoteGallery"] = extra
         rec["gallery"] = [f"/catalog/{slug}-{n + 2}.webp" for n in range(len(extra))
                           if os.path.exists(os.path.join(ROOT, "public", "catalog", f"{slug}-{n + 2}.webp"))]
