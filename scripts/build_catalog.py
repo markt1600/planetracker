@@ -437,12 +437,14 @@ def normalize_airlines(out):
         k = re.sub(r"\([^)]*\)", " ", a.lower())
         k = re.sub(r"[^a-z0-9 ]", " ", k)
         k = re.sub(r"\b(air ?lines?|the)\b", " ", k)
-        return re.sub(r"\s+", " ", k).strip()
+        return re.sub(r"\s+", "", k)  # spacing too: "Silk Air" / "Silkair", "Hong Kong Airlines" / "HongKong Airlines"
     counts = Counter(r["airline"] for r in out if r.get("airline"))
     best = {}
     for name, n in counts.items():
         k = key(name)
-        if k and (k not in best or n > counts[best[k]]):
+        # Most used wins; on a tie the spaced-out spelling ("Hi Fly" over "Hifly") reads better.
+        same_letters = k in best and re.sub(r"\W", "", name.lower()) == re.sub(r"\W", "", best[k].lower())
+        if k and (k not in best or n > counts[best[k]] or (n == counts[best[k]] and same_letters and name.count(" ") > best[k].count(" "))):
             best[k] = name
     for r in out:
         if r.get("airline") and key(r["airline"]) in best:
@@ -746,9 +748,9 @@ DAS_PREFIX = re.compile(r"^(?:NG Models?|Gemini ?Jets|Gemini ?200|GeminiMACS|Gem
                         r"Postage Stamp)\s+", re.I)
 
 
-def rec_das(c):
+def rec_das(c, brand=None):
     """One product card from a diecastairplanestore.com brand listing."""
-    brand = DAS_BRANDS.get((c.get("brand") or "").strip().lower())
+    brand = brand or DAS_BRANDS.get((c.get("brand") or "").strip().lower())
     # The picture's caption is the fuller title (it includes the livery); both end "<number> [Scale] 1:NNN".
     text = clean(c.get("alt") or c.get("title") or "")
     m = re.search(r"\s(\S*\d\S*)\s+(?:Scale\s+)?1:(\d+)\s*$", text) or re.search(r"\s(\S*\d\S*)\s+(?:Scale\s+)?1:(\d+)\s*$", clean(c.get("title") or ""))
@@ -779,6 +781,79 @@ def load_das():
         if c["url"] not in seen:
             seen.add(c["url"])
             out.append(c)
+    return out
+
+
+DAS_ARCHIVE_BRANDS = {
+    "ng models": "NG Models", "ng lite": "NG Models", "herpa": "Herpa Wings", "herpa wings": "Herpa Wings",
+    "phoenix 1:400": "Phoenix Models", "aeroclassics": "AeroClassics", "c models": "C Models", "fantasy wings": "Fantasy Wings",
+    "odewm": "ODEWM", "kj models": "KJ Models", "ard400": "ARD Models", "bigbird400": "Big Bird",
+}
+# Lines every product page repeats; what is left over says something about this particular model.
+DAS_BOILERPLATE = re.compile(r"^(?:&nbsp;|Die-?cast metal|Detailed (?:scale )?landing gear|Limited production run|Display stand included|"
+                             r"Finished model size|Tampo-printed|Dimensions:|Material:|Accessories:|Ultimate edition|This die-cast|"
+                             r"Jet-X Models features|See the full)", re.I)
+DAS_SKIP = re.compile(r"\b(?:repaired|damaged?|broken|pre-?owned|as[- ]is)\b", re.I)
+DAS_BY_NUMBER = [(r"^(?:G[J2]|GJ)[A-Z]{3}\d", "gemini jets"), (r"^PH4", "phoenix model"), (r"^(?:LH[24]|XX[24]|JC[24])", "jc wings")]
+
+
+DAS_TYPOS = {"Tukish": "Turkish", "Portgual": "Portugal", "Allegient": "Allegiant", "Internatiional": "International",
+             "Tuploev": "Tupolev", "Deutscheland": "Deutschland"}
+# Where an airline name stops on pages whose aircraft type the catalogue does not recognise.
+DAS_AIRLINE_END = re.compile(
+    r"\s+(?:Gulfstream|Dassault|Falcon|Tupolev|Douglas|Vickers|Convair|Dornier|Sud SE|Hawker|Dash 8|Saab|C[Vv]-?\d|EMB|E[Rr][Jj]|"
+    r"H[Ss]-?748|DHC|TriStar|Boeing|Q200|E145|P-3B|with\b|named\b|hybrid\b|(?:old|new|delivery|early|\d{4}'?s)\b.*\blivery\b|#\d).*$"
+    r"|\s+(?:[A-Z0-9]{1,2}-[A-Z0-9]{3,5}|N\d{2,5}[A-Z]{0,2})$|;.*$")
+
+
+def das_airline(a):
+    a = re.sub(r"^(?:AeroClassics|NG Lite|KJ Models|(?:El )?Aviador)\s+", "", a)
+    a = DAS_AIRLINE_END.sub("", a).strip(" -/,")
+    for wrong, right in DAS_TYPOS.items():
+        a = re.sub(wrong, right, a, flags=re.I)
+    return a if len(a) > 1 and a.lower() != "the" else None
+
+
+def rec_das_archive(p):
+    """One archived product page from diecastairplanestore.com (models no longer in its brand listings)."""
+    name = clean((p.get("name") or "").replace("\x96", "-"))
+    for wrong, right in DAS_TYPOS.items():
+        name = name.replace(wrong, right)
+    if p.get("error") or not name or DAS_SKIP.search(name):
+        return None
+    key = (p.get("brand") or "").strip().lower()
+    if not key:  # a few pages name no manufacturer; the model number says which it is
+        sku = (p.get("sku") or "").strip().upper()
+        key = next((b for rx, b in DAS_BY_NUMBER if re.match(rx, sku)), "")
+    if key in ("geminimacs", "hobby master"):  # military lines; this read is airliners only
+        return None
+    brand = DAS_ARCHIVE_BRANDS.get(key) or DAS_BRANDS.get(key)
+    if not brand:
+        return None
+    r = rec_das({"alt": name, "title": name, "image": p.get("image"), "usd": p.get("usd"), "url": p["url"],
+                 "soldOut": not p.get("inStock")}, brand)
+    if not r:
+        return None
+    if r.get("airline"):
+        r["airline"] = das_airline(r["airline"])
+    lines = [l.strip() for l in (p.get("description") or "").split("\n") if l.strip()][1:]
+    rest = [l for l in lines if not DAS_BOILERPLATE.match(l) and not DAS_SKIP.search(l)]
+    text = clean_description(" ".join(rest)) if rest else None
+    if text and len(text) > 3:
+        r["description"] = text
+    return r
+
+
+def load_das_archive():
+    path = os.path.join(RAW, "das", "archive.jsonl")
+    if not os.path.exists(path):
+        path = os.path.join(ROOT, "data", "sources", "das-archive.jsonl")
+    seen, out = {c["url"] for c in load_das()}, []
+    for line in (open(path) if os.path.exists(path) else []):
+        p = json.loads(line)
+        if p["url"] not in seen:
+            seen.add(p["url"])
+            out.append(p)
     return out
 
 
@@ -843,7 +918,11 @@ def main():
     for c in load_das():  # last, so its photos are added after the ones already stored
         r = rec_das(c)
         if r: recs.append(r)
-    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd+ams {n4 - n3}, sms {n5 - n4}, das {len(recs) - n5}")
+    n6 = len(recs)
+    for p in load_das_archive():  # after the listings, for the same reason
+        r = rec_das_archive(p)
+        if r: recs.append(r)
+    print(f"records: amsg {n1}, ard {n2 - n1}, tas {n3 - n2}, wcd+ams {n4 - n3}, sms {n5 - n4}, das {n6 - n5}, das archive {len(recs) - n6}")
 
     merged = {}
     # A shop that files a sister brand under "InFlight200": use the brand everyone else gives that number.
